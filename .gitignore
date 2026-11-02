@@ -15,3 +15,14 @@ tools/*.txt
 *.patch
 *.diff
 *.sh
+
+# Editor and agent directories
+.claude/
+.codegraph/
+.codex/
+.cursor/
+.kiro/
+.mcp.json
+.vscode/
+opencode.jsonc
+AGENTS.md

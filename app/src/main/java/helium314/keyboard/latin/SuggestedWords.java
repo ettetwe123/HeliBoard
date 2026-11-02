@@ -37,6 +37,11 @@ public class SuggestedWords {
             false, false, InputStyle.NONE, NOT_A_SEQUENCE_NUMBER);
 
     @NonNull
+    private static final SuggestedWords EMPTY_TABLE_IME = new SuggestedWords(
+            EMPTY_WORD_INFO_LIST, null, null, false,
+            false, false, InputStyle.NONE, NOT_A_SEQUENCE_NUMBER, true);
+
+    @NonNull
     private static final SuggestedWords EMPTY_BATCH = new SuggestedWords(
             EMPTY_WORD_INFO_LIST, null, null, false,
             false, false, InputStyle.UPDATE_BATCH, NOT_A_SEQUENCE_NUMBER);
@@ -49,6 +54,7 @@ public class SuggestedWords {
     // whether this exactly matches the user entry or not.
     public final boolean mWillAutoCorrect;
     public final boolean mIsObsoleteSuggestions;
+    public final boolean mIsTableIme;
     // How the input for these suggested words was done by the user
     public final InputStyle mInputStyle;
     public final int mSequenceNumber; // Sequence number for auto-commit.
@@ -60,6 +66,12 @@ public class SuggestedWords {
     public SuggestedWords(@NonNull ArrayList<SuggestedWordInfo> suggestedWordInfoList,
             @Nullable ArrayList<SuggestedWordInfo> rawSuggestions, @Nullable SuggestedWordInfo typedWordInfo,
             boolean typedWordValid, boolean willAutoCorrect, boolean isObsoleteSuggestions, InputStyle inputStyle, int sequenceNumber) {
+        this(suggestedWordInfoList, rawSuggestions, typedWordInfo, typedWordValid, willAutoCorrect, isObsoleteSuggestions, inputStyle, sequenceNumber, false);
+    }
+
+    public SuggestedWords(@NonNull ArrayList<SuggestedWordInfo> suggestedWordInfoList,
+            @Nullable ArrayList<SuggestedWordInfo> rawSuggestions, @Nullable SuggestedWordInfo typedWordInfo,
+            boolean typedWordValid, boolean willAutoCorrect, boolean isObsoleteSuggestions, InputStyle inputStyle, int sequenceNumber, boolean isTableIme) {
         mSuggestedWordInfoList = suggestedWordInfoList;
         mRawSuggestions = rawSuggestions;
         mTypedWordValid = typedWordValid;
@@ -68,6 +80,7 @@ public class SuggestedWords {
         mInputStyle = inputStyle;
         mSequenceNumber = sequenceNumber;
         mTypedWordInfo = typedWordInfo;
+        mIsTableIme = isTableIme;
     }
 
     public boolean isEmpty() {
@@ -84,7 +97,7 @@ public class SuggestedWords {
      * @return the count of suggested word to show as suggestions to UI.
      */
     public int getWordCountToShow() {
-        if (isPrediction()) {
+        if (mIsTableIme || isPrediction()) {
             return size();
         }
         return size() - /* typed word */ 1;
@@ -185,6 +198,11 @@ public class SuggestedWords {
     @NonNull
     public static SuggestedWords getEmptyInstance() {
         return SuggestedWords.EMPTY;
+    }
+
+    @NonNull
+    public static SuggestedWords getEmptyInstance(final boolean isTableIme) {
+        return isTableIme ? SuggestedWords.EMPTY_TABLE_IME : SuggestedWords.EMPTY;
     }
 
     @NonNull

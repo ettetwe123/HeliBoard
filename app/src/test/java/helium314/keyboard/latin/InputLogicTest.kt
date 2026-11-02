@@ -161,6 +161,73 @@ class InputLogicTest {
         assertEquals("ㅂ갸", text)
     }
 
+    @Test fun testCangjieTyping() {
+        val zh = SubtypeSettings.getResourceSubtypesForLocale("zh-HK".constructLocale()).firstOrNull()
+        assert(zh != null)
+        latinIME.switchToSubtype(zh!!)
+
+        // Test typing 'a' -> composing "日"
+        input('a')
+        assertEquals("日", composingText)
+        // Space commits 1st candidate "日" without extra space
+        input(Constants.CODE_SPACE)
+        assertEquals("日", text)
+        assertEquals("", composingText)
+
+        // Test typing 'ab' -> composing "日月"
+        input('a')
+        assertEquals("日日", text)
+        assertEquals("日", composingText)
+        input('b')
+        assertEquals("日月", composingText)
+        // Space commits 1st candidate "明"
+        input(Constants.CODE_SPACE)
+        assertEquals("日明", text)
+        assertEquals("", composingText)
+
+        // Test typing 'ab' + Enter -> commits "明"
+        input('a')
+        input('b')
+        assertEquals("日月", composingText)
+        input(Constants.CODE_ENTER)
+        assertEquals("日明明", text)
+        assertEquals("", composingText)
+
+        // Test typing 'vnd' -> composing "女弓木" -> candidates should have "好" at index 0 -> Space commits "好"
+        input('v')
+        input('n')
+        input('d')
+        assertEquals("女弓木", composingText)
+        input(Constants.CODE_SPACE)
+        assertEquals("日明明好", text)
+        assertEquals("", composingText)
+
+        // Test Backspace
+        input('a')
+        input('b')
+        assertEquals("日月", composingText)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("日", composingText)
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("", composingText)
+        assertEquals("日明明好", text)
+    }
+
+    @Test fun testLanguageSwitchWithCangjie() {
+        val prefs = latinIME.prefs()
+        val en = SubtypeSettings.getResourceSubtypesForLocale(Locale.US).first()
+        val zh = SubtypeSettings.getResourceSubtypesForLocale("zh-HK".constructLocale()).first()
+        SubtypeSettings.addEnabledSubtype(prefs, en)
+        SubtypeSettings.addEnabledSubtype(prefs, zh)
+        val imm = RichInputMethodManager.getInstance()
+        println("enabledSubtypes: " + SubtypeSettings.getEnabledSubtypes(true))
+        latinIME.switchToSubtype(en)
+        println("current subtype before: " + imm.currentSubtype.locale)
+        latinIME.switchToNextSubtype()
+        println("after switch: " + imm.currentSubtype.locale)
+        assertEquals("zh_HK", imm.currentSubtype.locale.toString())
+    }
+
     @Test fun emojiHangul() {
         val ko = SubtypeSettings.getResourceSubtypesForLocale("ko".constructLocale()).first()
         latinIME.switchToSubtype(ko)

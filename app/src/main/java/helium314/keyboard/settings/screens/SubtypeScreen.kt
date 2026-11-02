@@ -43,6 +43,7 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.common.Links
+import helium314.keyboard.latin.tableime.TableImeRegistry
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.dictionary.getDictionaryLocales
@@ -226,6 +227,31 @@ fun SubtypeScreen(
                             DefaultButton(checked == null) {
                                 setCurrentSubtype(currentSubtype.without(ExtraValue.LOCALIZED_NUMBER_ROW))
                             }
+                        }
+                    }
+                }
+                val combiningRules = currentSubtype.getExtraValueOf(ExtraValue.COMBINING_RULES)
+                if (TableImeRegistry.isTableIme(combiningRules)) {
+                    val checked = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_EXTENDED)?.toBoolean() ?: false
+                    WithSmallTitle(stringResource(R.string.table_ime_extended_title)) {
+                        ActionRow {
+                            Text(
+                                stringResource(R.string.table_ime_extended_summary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp)
+                            )
+                            Switch(
+                                checked = checked,
+                                onCheckedChange = {
+                                    if (it) {
+                                        setCurrentSubtype(currentSubtype.with(ExtraValue.TABLE_IME_EXTENDED, "true"))
+                                        TableImeRegistry.ensureExtendedLoaded(ctx, combiningRules!!)
+                                    } else {
+                                        setCurrentSubtype(currentSubtype.without(ExtraValue.TABLE_IME_EXTENDED))
+                                    }
+                                }
+                            )
                         }
                     }
                 }

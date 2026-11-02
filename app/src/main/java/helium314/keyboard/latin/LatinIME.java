@@ -60,6 +60,7 @@ import helium314.keyboard.latin.inputlogic.InputLogic;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsSubtype;
 import helium314.keyboard.latin.settings.SettingsValues;
+import helium314.keyboard.latin.tableime.TableImeRegistry;
 import helium314.keyboard.latin.suggestions.SuggestionStripView;
 import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
 import helium314.keyboard.latin.touchinputconsumer.GestureConsumer;
@@ -857,7 +858,12 @@ public class LatinIME extends InputMethodService implements
             // span, so we should reset our state unconditionally, even if restarting is true.
             // We also tell the input logic about the combining rules for the current subtype, so
             // it can adjust its combiners if needed.
-            mInputLogic.startInput(mRichImm.getCombiningRulesExtraValueOfCurrentSubtype(), currentSettingsValues);
+            final String combiningRules = mRichImm.getCombiningRulesExtraValueOfCurrentSubtype();
+            mInputLogic.startInput(combiningRules, currentSettingsValues);
+            if (TableImeRegistry.INSTANCE.isTableIme(combiningRules)) {
+                final boolean includeExtended = mRichImm.getCurrentSubtype().hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED);
+                TableImeRegistry.INSTANCE.preloadAsync(this, combiningRules, includeExtended);
+            }
 
             resetDictionaryFacilitatorIfNecessary();
 

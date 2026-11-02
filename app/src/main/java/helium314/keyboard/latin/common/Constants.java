@@ -95,6 +95,9 @@ public final class Constants {
             /** Overrides the general "localized number row" setting */
             public static final String LOCALIZED_NUMBER_ROW = "LocalizedNumberRow";
 
+            /** Indicates whether extended table (rare characters) should be enabled for Table IME */
+            public static final String TABLE_IME_EXTENDED = "TableImeExtended";
+
             private ExtraValue() {
                 // This utility class is not publicly instantiable.
             }

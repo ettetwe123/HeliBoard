@@ -61,6 +61,7 @@ public final class WordComposer {
      * Whether the composing word has the only first char capitalized.
      */
     private boolean mIsOnlyFirstCharCapitalized;
+    private String mRawComposingCode = "";
 
     public WordComposer() {
         mCombinerChain = new CombinerChain("", "");
@@ -71,6 +72,7 @@ public final class WordComposer {
         mIsBatchMode = false;
         mCursorPositionWithinWord = 0;
         mRejectedBatchModeSuggestion = null;
+        mRawComposingCode = "";
         refreshTypedWordCache();
     }
 
@@ -94,6 +96,9 @@ public final class WordComposer {
         mCodePointSize = other.mCodePointSize;
         mCursorPositionWithinWord = other.mCursorPositionWithinWord;
         mIsOnlyFirstCharCapitalized = other.mIsOnlyFirstCharCapitalized;
+        mCombiningSpec = other.mCombiningSpec;
+        mCombinerChain = other.mCombinerChain;
+        mRawComposingCode = other.mRawComposingCode;
     }
 
     public ComposedData getComposedDataSnapshot() {
@@ -132,6 +137,7 @@ public final class WordComposer {
     private void refreshTypedWordCache() {
         int oldSize = mCodePointSize;
         mTypedWordCache = mCombinerChain.getComposingWordWithCombiningFeedback();
+        mRawComposingCode = mCombinerChain.getRawCode();
         mCodePointSize = Character.codePointCount(mTypedWordCache, 0, mTypedWordCache.length());
         mCursorPositionWithinWord += mCodePointSize - oldSize;
         // should not be necessary after setting mCursorPositionWithinWord at the end of reset, but still better not crash
@@ -498,6 +504,11 @@ public final class WordComposer {
      */
     public String getCombiningSpec() {
         return mCombiningSpec;
+    }
+
+    public String getRawComposingCode() {
+        if (mRawComposingCode != null) return mRawComposingCode;
+        return mCombinerChain != null ? mCombinerChain.getRawCode() : "";
     }
 
     void addInputPointerForTest(int index, int keyX, int keyY) {

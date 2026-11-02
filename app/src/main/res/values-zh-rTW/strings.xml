@@ -156,4 +156,7 @@
     <string name="settings_screen_about">關於</string>
     <string name="settings_screen_toolbar">工具列</string>
     <string name="label_delete_key" tools:keep="@string/label_delete_key">Delete</string>
+    <string name="subtype_generic_cangjie">%s (倉頡)</string>
+    <string name="table_ime_extended_title">包含罕用字（擴展字表）</string>
+    <string name="table_ime_extended_summary">搜尋擴展字碼表（更多候選字）</string>
 </resources>

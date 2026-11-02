@@ -27,6 +27,7 @@ import helium314.keyboard.latin.utils.BackgroundGatheringCache
 import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.WordData
 import helium314.keyboard.latin.utils.useBackgroundGathering
+import helium314.keyboard.latin.tableime.TableImeRegistry
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -59,14 +60,69 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
     fun getSuggestedWords(wordComposer: WordComposer, ngramContext: NgramContext, keyboard: Keyboard,
                           settingsValuesForSuggestion: SettingsValuesForSuggestion, isCorrectionEnabled: Boolean,
-                          inputStyle: InputStyle, sequenceNumber: Int): SuggestedWords =
-        if (wordComposer.isBatchMode) {
+                          inputStyle: InputStyle, sequenceNumber: Int): SuggestedWords {
+        val combiningSpec = wordComposer.combiningSpec
+        if (TableImeRegistry.isTableIme(combiningSpec)) {
+            return getSuggestedWordsForTableIme(wordComposer, combiningSpec, sequenceNumber)
+        }
+        return if (wordComposer.isBatchMode) {
             getSuggestedWordsForBatchInput(wordComposer, ngramContext, keyboard, settingsValuesForSuggestion,
                 inputStyle, isCorrectionEnabled, sequenceNumber)
         } else {
             getSuggestedWordsForNonBatchInput(wordComposer, ngramContext, keyboard, settingsValuesForSuggestion,
                 inputStyle, isCorrectionEnabled, sequenceNumber)
         }
+    }
+
+    private fun getSuggestedWordsForTableIme(
+        wordComposer: WordComposer,
+        combiningSpec: String,
+        sequenceNumber: Int
+    ): SuggestedWords {
+        val rawCode = wordComposer.rawComposingCode
+        if (rawCode.isEmpty()) {
+            return SuggestedWords.getEmptyInstance(true)
+        }
+        val context = Settings.getCurrentContext() ?: return SuggestedWords.getEmptyInstance(true)
+        val table = TableImeRegistry.getTable(context, combiningSpec)
+            ?: return SuggestedWords.getEmptyInstance(true)
+
+        val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
+        val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
+
+        val candidates = table.lookup(rawCode, includeExtended = includeExtended)
+        if (candidates.isEmpty()) {
+            return SuggestedWords.getEmptyInstance(true)
+        }
+
+        val suggestionsList = ArrayList<SuggestedWordInfo>(candidates.size)
+        for ((index, char) in candidates.withIndex()) {
+            suggestionsList.add(
+                SuggestedWordInfo(
+                    char,
+                    "",
+                    SuggestedWordInfo.MAX_SCORE - index,
+                    SuggestedWordInfo.KIND_CORRECTION,
+                    Dictionary.DICTIONARY_USER_TYPED,
+                    index,
+                    SuggestedWordInfo.NOT_A_CONFIDENCE
+                )
+            )
+        }
+
+        val firstInfo = suggestionsList[0]
+        return SuggestedWords(
+            suggestionsList,
+            null,
+            firstInfo,
+            true,
+            true,
+            false,
+            InputStyle.NONE,
+            sequenceNumber,
+            true
+        )
+    }
 
     // Retrieves suggestions for non-batch input (typing, recorrection, predictions...)
     // and calls the callback function with the suggestions.

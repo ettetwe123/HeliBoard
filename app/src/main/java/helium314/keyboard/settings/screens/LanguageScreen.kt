@@ -126,6 +126,7 @@ private fun SubtypeRow(subtype: InputMethodSubtype, isEnabled: Boolean) {
 
 private fun dictsAvailable(locale: Locale, context: Context): Boolean {
     if (locale.language == SubtypeLocaleUtils.NO_LANGUAGE) return true // incorrect, but we don't want to show the dialog for "no language"
+    if (helium314.keyboard.latin.tableime.TableImeRegistry.isTableImeLocale(locale)) return true
     val (dicts, hasInternal) = getUserAndInternalDictionaries(context, locale)
     return hasInternal || dicts.isNotEmpty()
 }

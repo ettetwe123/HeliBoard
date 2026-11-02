@@ -184,6 +184,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private var startIndexOfMoreSuggestions = 0
     private var isExternalSuggestionVisible = false // Required to disable the more suggestions if other suggestions are visible
     private val layoutHelper = SuggestionStripLayoutHelper(context, attrs, defStyle, wordViews, dividerViews, debugInfoViews)
+    private val tableImeLayoutHelper = TableImeSuggestionStripLayoutHelper(context, attrs, defStyle, wordViews, dividerViews, debugInfoViews)
+
+    private fun getLayoutHelper(suggestions: SuggestedWords): SuggestionStripLayoutHelper =
+        if (suggestions.mIsTableIme) tableImeLayoutHelper else layoutHelper
     private val moreSuggestionsView = moreSuggestionsContainer.findViewById<MoreSuggestionsView>(R.id.more_suggestions_view).apply {
         val slidingListener = object : SimpleOnGestureListener() {
             override fun onScroll(down: MotionEvent?, me: MotionEvent, deltaX: Float, deltaY: Float): Boolean {
@@ -245,7 +249,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         clear()
         setRtl(isRtlLanguage)
         suggestedWords = suggestions
-        startIndexOfMoreSuggestions = layoutHelper.layoutAndReturnStartIndexOfMoreSuggestions(
+        startIndexOfMoreSuggestions = getLayoutHelper(suggestedWords).layoutAndReturnStartIndexOfMoreSuggestions(
             context, suggestedWords, suggestionsStrip, this
         )
         isExternalSuggestionVisible = false
@@ -280,6 +284,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     fun setMoreSuggestionsHeight(remainingHeight: Int) {
         layoutHelper.setMoreSuggestionsHeight(remainingHeight)
+        tableImeLayoutHelper.setMoreSuggestionsHeight(remainingHeight)
     }
 
     fun dismissMoreSuggestionsPanel() {
@@ -432,7 +437,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             return false
         }
         if (!moreSuggestionsView.show(
-                suggestedWords, startIndexOfMoreSuggestions, moreSuggestionsContainer, layoutHelper, this
+                suggestedWords, startIndexOfMoreSuggestions, moreSuggestionsContainer, getLayoutHelper(suggestedWords), this
         ))
             return false
         for (i in 0..<startIndexOfMoreSuggestions) {

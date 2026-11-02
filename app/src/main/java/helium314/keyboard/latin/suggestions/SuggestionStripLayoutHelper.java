@@ -52,42 +52,42 @@ import helium314.keyboard.latin.utils.ViewLayoutUtils;
 
 import java.util.ArrayList;
 
-final class SuggestionStripLayoutHelper {
-    private static final int DEFAULT_SUGGESTIONS_COUNT_IN_STRIP = 3;
-    private static final float DEFAULT_CENTER_SUGGESTION_PERCENTILE = 0.40f;
-    private static final int DEFAULT_MAX_MORE_SUGGESTIONS_ROW = 2;
-    private static final int PUNCTUATIONS_IN_STRIP = 5;
-    private static final float MIN_TEXT_XSCALE = 0.70f;
+public class SuggestionStripLayoutHelper {
+    public static final int DEFAULT_SUGGESTIONS_COUNT_IN_STRIP = 3;
+    public static final float DEFAULT_CENTER_SUGGESTION_PERCENTILE = 0.40f;
+    public static final int DEFAULT_MAX_MORE_SUGGESTIONS_ROW = 2;
+    public static final int PUNCTUATIONS_IN_STRIP = 5;
+    public static final float MIN_TEXT_XSCALE = 0.70f;
 
     public final int mPadding;
     public final int mDividerWidth;
     public final int mSuggestionsStripHeight;
-    private final int mSuggestionsCountInStrip;
+    protected int mSuggestionsCountInStrip;
     public final int mMoreSuggestionsRowHeight;
-    private int mMaxMoreSuggestionsRow;
+    protected int mMaxMoreSuggestionsRow;
     public final float mMinMoreSuggestionsWidth;
     public final int mMoreSuggestionsBottomGap;
-    private boolean mMoreSuggestionsAvailable;
+    protected boolean mMoreSuggestionsAvailable;
 
     // The index of these {@link ArrayList} is the position in the suggestion strip. The indices
     // increase towards the right for LTR scripts and the left for RTL scripts, starting with 0.
     // The position of the most important suggestion is in {@link #mCenterPositionInStrip}
-    private final ArrayList<TextView> mWordViews;
-    private final ArrayList<View> mDividerViews;
-    private final ArrayList<TextView> mDebugInfoViews;
+    protected final ArrayList<TextView> mWordViews;
+    protected final ArrayList<View> mDividerViews;
+    protected final ArrayList<TextView> mDebugInfoViews;
 
-    private final int mColorValidTypedWord;
-    private final int mColorTypedWord;
-    private final int mColorAutoCorrect;
-    private final int mColorSuggested;
-    private final float mAlphaObsoleted;
-    private final float mCenterSuggestionWeight;
-    private final int mCenterPositionInStrip;
-    private final int mTypedWordPositionWhenAutocorrect;
-    private final Drawable mMoreSuggestionsHint;
+    protected final int mColorValidTypedWord;
+    protected final int mColorTypedWord;
+    protected final int mColorAutoCorrect;
+    protected final int mColorSuggested;
+    protected final float mAlphaObsoleted;
+    protected float mCenterSuggestionWeight;
+    protected int mCenterPositionInStrip;
+    protected int mTypedWordPositionWhenAutocorrect;
+    protected final Drawable mMoreSuggestionsHint;
     private static final String MORE_SUGGESTIONS_HINT = "…";
 
-    private static final CharacterStyle BOLD_SPAN = new StyleSpan(Typeface.BOLD);
+    protected static final CharacterStyle BOLD_SPAN = new StyleSpan(Typeface.BOLD);
     private static final CharacterStyle UNDERLINE_SPAN = new UnderlineSpan();
 
     private final int mSuggestionStripOptions;
@@ -187,7 +187,7 @@ final class SuggestionStripLayoutHelper {
         return bitmapDrawable;
     }
 
-    private CharSequence getStyledSuggestedWord(final SuggestedWords suggestedWords,
+    protected CharSequence getStyledSuggestedWord(final SuggestedWords suggestedWords,
             final int indexInSuggestedWords) {
         if (indexInSuggestedWords >= suggestedWords.size()) {
             return null;
@@ -222,7 +222,7 @@ final class SuggestionStripLayoutHelper {
      * @return Non-negative integer of the position in the suggestion strip.
      *         Negative integer if the word of the index shouldn't be shown on the suggestion strip.
      */
-    private int getPositionInSuggestionStrip(final int indexInSuggestedWords,
+    protected int getPositionInSuggestionStrip(final int indexInSuggestedWords,
             final SuggestedWords suggestedWords) {
         final SettingsValues settingsValues = Settings.getValues();
         final boolean shouldOmitTypedWord = shouldOmitTypedWord(suggestedWords.mInputStyle,
@@ -281,7 +281,7 @@ final class SuggestionStripLayoutHelper {
         return centerPositionInStrip + offsetFromCenter;
     }
 
-    private int getSuggestionTextColor(final SuggestedWords suggestedWords,
+    protected int getSuggestionTextColor(final SuggestedWords suggestedWords,
             final int indexInSuggestedWords) {
         // Use identity for strings, not #equals : it's the typed word if it's the same object
         final boolean isTypedWord = suggestedWords.getInfo(indexInSuggestedWords).isKindOf(SuggestedWordInfo.KIND_TYPED);
@@ -438,21 +438,21 @@ final class SuggestionStripLayoutHelper {
         ViewLayoutUtils.placeViewAt(debugInfoView, x - infoWidth, 0, infoWidth, debugInfoView.getMeasuredHeight());
     }
 
-    private int getSuggestionWidth(final int positionInStrip, final int maxWidth) {
+    protected int getSuggestionWidth(final int positionInStrip, final int maxWidth) {
         final int paddings = mPadding * mSuggestionsCountInStrip;
         final int dividers = mDividerWidth * (mSuggestionsCountInStrip - 1);
         final int availableWidth = maxWidth - paddings - dividers;
         return (int)(availableWidth * getSuggestionWeight(positionInStrip));
     }
 
-    private float getSuggestionWeight(final int positionInStrip) {
+    protected float getSuggestionWeight(final int positionInStrip) {
         if (positionInStrip == mCenterPositionInStrip) {
             return mCenterSuggestionWeight;
         }
         return (1.0f - mCenterSuggestionWeight) / (mSuggestionsCountInStrip - 1);
     }
 
-    private int setupWordViewsAndReturnStartIndexOfMoreSuggestions(
+    protected int setupWordViewsAndReturnStartIndexOfMoreSuggestions(
             final SuggestedWords suggestedWords, final int maxSuggestionInStrip) {
         // Clear all suggestions first
         for (int positionInStrip = 0; positionInStrip < maxSuggestionInStrip; ++positionInStrip) {
@@ -574,7 +574,7 @@ final class SuggestionStripLayoutHelper {
         return false;
     }
 
-    private static void addStyleSpan(@NonNull final Spannable text, final CharacterStyle style) {
+    protected static void addStyleSpan(@NonNull final Spannable text, final CharacterStyle style) {
         text.removeSpan(style);
         text.setSpan(style, 0, text.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
     }

@@ -9,6 +9,8 @@ package helium314.keyboard.event
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
+import helium314.keyboard.latin.tableime.TableImeCombiner
+import helium314.keyboard.latin.tableime.TableImeRegistry
 import java.util.*
 
 /**
@@ -43,7 +45,18 @@ class CombinerChain(initialText: String, combiningSpec: String) {
             mCombiners.add(HangulCombiner())
         else if (combiningSpec == "bn_khipro")
             mCombiners.add(BnKhiproCombiner())
+        else {
+            val tableImeSpec = TableImeRegistry.getSpec(combiningSpec)
+            if (tableImeSpec != null) {
+                val combiner = TableImeCombiner(tableImeSpec)
+                TableImeRegistry.activeCombiner = combiner
+                mCombiners.add(combiner)
+            }
+        }
     }
+
+    val rawCode: String
+        get() = mCombiners.filterIsInstance<TableImeCombiner>().firstOrNull()?.rawCode ?: ""
 
     fun reset() {
         mCombinedText.setLength(0)

@@ -8,6 +8,7 @@ package helium314.keyboard.latin.inputlogic;
 
 import static helium314.keyboard.latin.common.SuggestionSpanUtilsKt.getTextWithSuggestionSpan;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.SystemClock;
@@ -43,6 +44,11 @@ import helium314.keyboard.latin.LastComposedWord;
 import helium314.keyboard.latin.LatinIME;
 import helium314.keyboard.latin.NgramContext;
 import helium314.keyboard.latin.RichInputConnection;
+import helium314.keyboard.latin.RichInputMethodManager;
+import helium314.keyboard.latin.RichInputMethodSubtype;
+import helium314.keyboard.latin.tableime.TableImeRegistry;
+import helium314.keyboard.latin.tableime.TableImeTable;
+import java.util.List;
 import helium314.keyboard.latin.SingleDictionaryFacilitator;
 import helium314.keyboard.latin.Suggest;
 import helium314.keyboard.latin.Suggest.OnGetSuggestedWordsCallback;
@@ -350,8 +356,10 @@ public final class InputLogic {
         }
 
         // Space state must be updated before calling updateShiftState
-        if (settingsValues.mAutospaceAfterSuggestion)
+        if (settingsValues.mAutospaceAfterSuggestion && !TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec()))
             mSpaceState = SpaceState.PHANTOM;
+        else
+            mSpaceState = SpaceState.NONE;
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
         setInlineEmojiSearchAction(false);
 
@@ -677,6 +685,10 @@ public final class InputLogic {
             setComposingTextInternal(mWordComposer.getTypedWord(), 1);
             inputTransaction.setDidAffectContents();
             inputTransaction.setRequiresUpdateSuggestions();
+        } else if (TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
+            mConnection.commitText("", 1);
+            inputTransaction.setDidAffectContents();
+            inputTransaction.setRequiresUpdateSuggestions();
         }
     }
 
@@ -895,6 +907,44 @@ public final class InputLogic {
         }
     }
 
+    private void commitFirstCandidateOrCancel(final LatinIME.UIHandler handler, final boolean isEnter) {
+        String firstWord = null;
+        if (mSuggestedWords != null && mSuggestedWords.size() > 0) {
+            firstWord = mSuggestedWords.getInfo(0).mWord;
+        } else if (mWordComposer.isComposingWord()) {
+            final String rawCode = mWordComposer.getRawComposingCode();
+            final String combiningSpec = mWordComposer.getCombiningSpec();
+            if (rawCode != null && !rawCode.isEmpty() && combiningSpec != null) {
+                final Context context = Settings.getCurrentContext();
+                if (context != null) {
+                    final TableImeTable table = TableImeRegistry.INSTANCE.getTable(context, combiningSpec);
+                    if (table != null) {
+                        final RichInputMethodSubtype currentSubtype = RichInputMethodManager.getInstance().getCurrentSubtype();
+                        final boolean includeExtended = currentSubtype != null && currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED);
+                        final List<String> candidates = table.lookup(rawCode, includeExtended);
+                        if (!candidates.isEmpty()) {
+                            firstWord = candidates.get(0);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (firstWord != null) {
+            commitChosenWord(Settings.getValues(), firstWord, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
+            mSpaceState = SpaceState.NONE;
+        } else {
+            if (isEnter) {
+                commitChosenWord(Settings.getValues(), mWordComposer.getTypedWord(), LastComposedWord.COMMIT_TYPE_USER_TYPED_WORD, LastComposedWord.NOT_A_SEPARATOR);
+                mSpaceState = SpaceState.NONE;
+            } else {
+                return;
+            }
+        }
+        mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
+        handler.cancelUpdateSuggestionStrip();
+    }
+
     /**
      * Handle an event that is not a functional event.
      * <p>
@@ -907,6 +957,10 @@ public final class InputLogic {
     private void handleNonFunctionalEvent(final Event event, final InputTransaction inputTransaction, final LatinIME.UIHandler handler) {
         inputTransaction.setDidAffectContents();
         if (event.getCodePoint() == Constants.CODE_ENTER) {
+            if (mWordComposer.isComposingWord() && TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
+                commitFirstCandidateOrCancel(handler, true);
+                return;
+            }
             final EditorInfo editorInfo = getCurrentInputEditorInfo();
             final int imeOptionsActionId = InputTypeUtils.getImeOptionsActionIdFromEditorInfo(editorInfo);
             if (InputTypeUtils.IME_ACTION_CUSTOM_LABEL == imeOptionsActionId) {
@@ -947,6 +1001,12 @@ public final class InputLogic {
             final InputTransaction inputTransaction,
             final LatinIME.UIHandler handler) {
         final int codePoint = event.getCodePoint();
+        if (mWordComposer.isComposingWord() && TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
+            if (codePoint == Constants.CODE_SPACE) {
+                commitFirstCandidateOrCancel(handler, false);
+                return;
+            }
+        }
         mSpaceState = SpaceState.NONE;
         final SettingsValues sv = inputTransaction.getSettingsValues();
 
@@ -1734,7 +1794,10 @@ public final class InputLogic {
                 // Show new suggestions if we have at least one. Otherwise keep the old
                 // suggestions with the new typed word. Exception: if the length of the
                 // typed word is <= 1 (after a deletion typically) we clear old suggestions.
-                if (suggestedWords.size() > 1 || typedWordString.length() <= 1) {
+                if (suggestedWords.mIsTableIme
+                        || TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())
+                        || suggestedWords.size() > 1
+                        || typedWordString.length() <= 1) {
                     holder.set(suggestedWords);
                 } else {
                     holder.set(retrieveOlderSuggestions(typedWordInfo, mSuggestedWords));

@@ -119,4 +119,7 @@
     <string name="label_search_key">"搜尋"</string>
     <string name="label_pause_key">"暫停"</string>
     <string name="label_wait_key">"等候"</string>
+    <string name="subtype_generic_cangjie">%s (倉頡)</string>
+    <string name="table_ime_extended_title">包含罕用字（擴展字表）</string>
+    <string name="table_ime_extended_summary">搜尋擴展字碼表（更多候選字）</string>
 </resources>
