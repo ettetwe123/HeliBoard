@@ -85,6 +85,10 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         val rawCode = wordComposer.rawComposingCode
         val context = Settings.getCurrentContext() ?: return TableImeSuggestedWords.empty(sequenceNumber)
 
+        val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
+        val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
+        val frequentWordCounts = if (adjustFreq) TableImeUserHistory.getFrequentWordCounts(context, combiningSpec) else null
+
         if (rawCode.isEmpty()) {
             if (!Settings.getValues().mBigramPredictionEnabled) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
@@ -95,7 +99,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             if (prevWord.isEmpty()) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }
-            val candidates = predictor.predict(prevWord)
+            val candidates = predictor.predict(prevWord, frequentWordCounts = frequentWordCounts)
             if (candidates.isEmpty()) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }
@@ -119,12 +123,9 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         val table = TableImeRegistry.getTable(context, combiningSpec)
             ?: return TableImeSuggestedWords.empty(sequenceNumber)
 
-        val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
-        val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
-        val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWords(context, combiningSpec) else null
 
-        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWords = frequentWords)
+        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWordCounts = frequentWordCounts)
         if (candidates.isEmpty()) {
             return TableImeSuggestedWords.empty(sequenceNumber)
         }

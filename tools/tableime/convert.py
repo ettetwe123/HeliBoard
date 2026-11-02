@@ -3,7 +3,7 @@
 
 import os
 
-def convert_dict(yaml_path, tsv_path):
+def convert_dict(yaml_path, tsv_path, max_codepoint=None):
     entries = []
     with open(yaml_path, 'r', encoding='utf-8') as f:
         in_header = True
@@ -22,6 +22,8 @@ def convert_dict(yaml_path, tsv_path):
                 text = parts[0].strip()
                 code = parts[1].strip().lower()
                 if text and code:
+                    if max_codepoint is not None and any(ord(c) > max_codepoint for c in text):
+                        continue
                     entries.append((code, text))
     
     # Stable sort by code length and then code alphabetically, or purely by code?
@@ -77,7 +79,18 @@ def main():
     if os.path.exists(base_yaml):
         convert_dict(base_yaml, os.path.join(out_dir, "cangjie5_base.tsv"))
     if os.path.exists(extended_yaml):
-        convert_dict(extended_yaml, os.path.join(out_dir, "cangjie5_extended.tsv"))
+        # Filter characters above 0xFFFF (Ext B/C/D/E) that cannot be rendered on Android or PC
+        convert_dict(extended_yaml, os.path.join(out_dir, "cangjie5_extended.tsv"), max_codepoint=0xFFFF)
+    elif os.path.exists(os.path.join(out_dir, "cangjie5_extended.tsv")):
+        # If TSV already exists, ensure code points above 0xFFFF are filtered
+        ext_tsv = os.path.join(out_dir, "cangjie5_extended.tsv")
+        with open(ext_tsv, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        filtered = [l for l in lines if l.strip() and all(ord(c) <= 0xFFFF for c in l.split('\t')[1].strip())]
+        if len(filtered) != len(lines):
+            with open(ext_tsv, "w", encoding="utf-8") as f:
+                f.writelines(filtered)
+            print(f"Filtered {ext_tsv}: {len(lines)} -> {len(filtered)} entries")
     if os.path.exists(words_yaml):
         convert_words_dict(words_yaml, os.path.join(out_dir, "jyut6ping3_words.tsv"))
     

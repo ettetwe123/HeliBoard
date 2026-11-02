@@ -8,34 +8,57 @@ import java.util.concurrent.ConcurrentHashMap
 
 object TableImeUserHistory {
     private const val KEY_PREFIX = "table_ime_freq_words_"
+    private const val KEY_COUNTS_SUFFIX = "_counts"
 
-    // In-memory set of used characters per table id (e.g. "cangjie")
-    private val memoryCache = ConcurrentHashMap<String, MutableSet<String>>()
+    // In-memory map of word -> count per table id (e.g. "cangjie5")
+    private val memoryCache = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
 
-    fun getFrequentWords(context: Context, tableId: String): Set<String> {
+    fun getFrequentWordCounts(context: Context, tableId: String): Map<String, Int> {
         val existing = memoryCache[tableId]
         if (existing != null) return existing
 
+        val map = ConcurrentHashMap<String, Int>()
         val prefs = DeviceProtectedUtils.getSharedPreferences(context)
-        val saved = prefs.getStringSet(KEY_PREFIX + tableId, null) ?: emptySet()
-        val set = ConcurrentHashMap.newKeySet<String>().apply { addAll(saved) }
-        memoryCache[tableId] = set
-        return set
+        val serialized = prefs.getString(KEY_PREFIX + tableId + KEY_COUNTS_SUFFIX, null)
+        if (serialized != null) {
+            for (line in serialized.lineSequence()) {
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) continue
+                val tab = trimmed.indexOf('\t')
+                if (tab > 0) {
+                    val key = trimmed.substring(0, tab)
+                    val count = trimmed.substring(tab + 1).toIntOrNull() ?: 1
+                    map[key] = count
+                }
+            }
+        } else {
+            // Backward compatibility with legacy StringSet
+            val legacy = prefs.getStringSet(KEY_PREFIX + tableId, null)
+            if (legacy != null) {
+                for (w in legacy) {
+                    map[w] = 1
+                }
+            }
+        }
+        memoryCache[tableId] = map
+        return map
+    }
+
+    fun getFrequentWords(context: Context, tableId: String): Set<String> {
+        return getFrequentWordCounts(context, tableId).keys
     }
 
     fun recordWord(context: Context, tableId: String, word: String) {
         if (word.isEmpty()) return
-        val set = memoryCache.getOrPut(tableId) {
-            val prefs = DeviceProtectedUtils.getSharedPreferences(context)
-            val saved = prefs.getStringSet(KEY_PREFIX + tableId, null) ?: emptySet()
-            ConcurrentHashMap.newKeySet<String>().apply { addAll(saved) }
-        }
+        val map = (getFrequentWordCounts(context, tableId) as? ConcurrentHashMap<String, Int>)
+            ?: memoryCache.getOrPut(tableId) { ConcurrentHashMap() }
 
-        if (set.add(word)) {
-            val prefs = DeviceProtectedUtils.getSharedPreferences(context)
-            prefs.edit {
-                putStringSet(KEY_PREFIX + tableId, HashSet(set))
-            }
+        map.compute(word) { _, count -> (count ?: 0) + 1 }
+
+        val serialized = map.entries.joinToString("\n") { "${it.key}\t${it.value}" }
+        val prefs = DeviceProtectedUtils.getSharedPreferences(context)
+        prefs.edit {
+            putString(KEY_PREFIX + tableId + KEY_COUNTS_SUFFIX, serialized)
         }
     }
 
@@ -44,6 +67,7 @@ object TableImeUserHistory {
         val prefs = DeviceProtectedUtils.getSharedPreferences(context)
         prefs.edit {
             remove(KEY_PREFIX + tableId)
+            remove(KEY_PREFIX + tableId + KEY_COUNTS_SUFFIX)
         }
     }
 }

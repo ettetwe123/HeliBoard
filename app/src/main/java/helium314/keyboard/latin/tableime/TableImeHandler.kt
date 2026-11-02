@@ -101,8 +101,8 @@ object TableImeHandler {
                         val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
                         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
                         val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
-                        val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWords(context, combiningSpec) else null
-                        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWords = frequentWords)
+                        val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWordCounts(context, combiningSpec) else null
+                        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWordCounts = frequentWords)
                         if (candidates.isNotEmpty()) {
                             firstWord = candidates[0]
                         }

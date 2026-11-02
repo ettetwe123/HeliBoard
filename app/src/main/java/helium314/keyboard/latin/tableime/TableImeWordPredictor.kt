@@ -13,9 +13,14 @@ class TableImeWordPredictor(
      * Given text before the cursor, predicts the next continuation words/characters.
      * Searches with longest suffix of [textBeforeCursor] first (e.g. 4, 3, 2, 1 characters).
      * Candidates are continuations (e.g. for prefix "香", word "香港" yields "港").
-     * Candidates are deduplicated and sorted by continuation length (shorter first).
+     * Candidates are deduplicated and sorted by frequency count DESC if frequent,
+     * then by continuation length (shorter first).
      */
-    fun predict(textBeforeCursor: String, maxCandidates: Int = 500): List<String> {
+    fun predict(
+        textBeforeCursor: String,
+        maxCandidates: Int = 500,
+        frequentWordCounts: Map<String, Int>? = null
+    ): List<String> {
         if (textBeforeCursor.isEmpty() || words.isEmpty()) return emptyList()
 
         val trimmed = textBeforeCursor.trimEnd()
@@ -25,7 +30,7 @@ class TableImeWordPredictor(
         val maxPrefixLen = minOf(4, trimmed.length)
         for (len in maxPrefixLen downTo 1) {
             val prefix = trimmed.substring(trimmed.length - len)
-            val candidates = lookupContinuations(prefix, maxCandidates)
+            val candidates = lookupContinuations(prefix, maxCandidates, frequentWordCounts)
             if (candidates.isNotEmpty()) {
                 return candidates
             }
@@ -36,7 +41,11 @@ class TableImeWordPredictor(
     /**
      * Finds continuations for a given prefix in the sorted word list.
      */
-    fun lookupContinuations(prefix: String, maxCandidates: Int = 500): List<String> {
+    fun lookupContinuations(
+        prefix: String,
+        maxCandidates: Int = 500,
+        frequentWordCounts: Map<String, Int>? = null
+    ): List<String> {
         if (prefix.isEmpty()) return emptyList()
 
         val lo = lowerBound(words, prefix)
@@ -61,14 +70,42 @@ class TableImeWordPredictor(
             if (diff != 0) diff else a.compareTo(b)
         }
 
-        val results = ArrayList<String>(minOf(matches.size, maxCandidates))
+        val rawContinuations = ArrayList<String>()
         val seen = HashSet<String>()
         for (w in matches) {
             val continuation = w.substring(prefix.length)
             if (continuation.isNotEmpty() && seen.add(continuation)) {
-                results.add(continuation)
-                if (results.size >= maxCandidates) break
+                rawContinuations.add(continuation)
             }
+        }
+
+        if (frequentWordCounts.isNullOrEmpty()) {
+            return if (rawContinuations.size > maxCandidates) rawContinuations.subList(0, maxCandidates) else rawContinuations
+        }
+
+        val frequentList = ArrayList<String>()
+        val nonFrequentList = ArrayList<String>()
+        for (c in rawContinuations) {
+            if ((frequentWordCounts[c] ?: 0) > 0) {
+                frequentList.add(c)
+            } else {
+                nonFrequentList.add(c)
+            }
+        }
+        frequentList.sortWith { a, b ->
+            val ca = frequentWordCounts[a] ?: 0
+            val cb = frequentWordCounts[b] ?: 0
+            cb.compareTo(ca)
+        }
+
+        val results = ArrayList<String>(minOf(frequentList.size + nonFrequentList.size, maxCandidates))
+        for (w in frequentList) {
+            if (results.size >= maxCandidates) break
+            results.add(w)
+        }
+        for (w in nonFrequentList) {
+            if (results.size >= maxCandidates) break
+            results.add(w)
         }
         return results
     }

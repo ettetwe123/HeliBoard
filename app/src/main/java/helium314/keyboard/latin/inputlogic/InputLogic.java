@@ -348,7 +348,7 @@ public final class InputLogic {
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
 
-        if (suggestedWords instanceof TableImeSuggestedWords && !((TableImeSuggestedWords) suggestedWords).isPrediction()) {
+        if (suggestedWords instanceof TableImeSuggestedWords) {
             TableImeHandler.onWordCommitted(mWordComposer.getCombiningSpec(), suggestion);
         }
 

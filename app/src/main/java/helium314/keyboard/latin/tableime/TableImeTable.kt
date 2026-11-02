@@ -17,12 +17,31 @@ class TableImeTable(
      * Exact matches come first, followed by prefix matches.
      * Base entries come before extended entries.
      */
+    fun lookup(
+        code: String,
+        includeExtended: Boolean = false,
+        maxCandidates: Int = 500,
+        frequentWords: Set<String>?
+    ): List<String> = lookup(
+        code,
+        includeExtended,
+        maxCandidates,
+        frequentWords?.associateWith { 1 }
+    )
+
+    /**
+     * Looks up candidates for a given code.
+     * Option A ordering:
+     * 1. Exact matches (frequent words sorted by usage count DESC, then non-frequent in table order).
+     * 2. Prefix matches (frequent words sorted by usage count DESC, then non-frequent in table order).
+     * Base entries come before extended entries.
+     */
     @JvmOverloads
     fun lookup(
         code: String,
         includeExtended: Boolean = false,
         maxCandidates: Int = 500,
-        frequentWords: Set<String>? = null
+        frequentWordCounts: Map<String, Int>? = null
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()
@@ -49,28 +68,38 @@ class TableImeTable(
             collectPrefixMatches(ext, query, prefixMatches, maxCandidates - exactMatches.size)
         }
 
-        if (frequentWords.isNullOrEmpty()) {
+        if (frequentWordCounts.isNullOrEmpty()) {
             val candidates = ArrayList<String>(exactMatches.size + prefixMatches.size)
             candidates.addAll(exactMatches)
             candidates.addAll(prefixMatches)
             return candidates
         }
 
-        // Option A: Exact matches (frequent first, then non-frequent),
-        // followed by Prefix matches (frequent first, then non-frequent).
+        // Option A: Exact matches (frequent sorted by count DESC, then non-frequent in table order),
+        // followed by Prefix matches (frequent sorted by count DESC, then non-frequent in table order).
         val result = ArrayList<String>(exactMatches.size + prefixMatches.size)
-        for (word in exactMatches) {
-            if (frequentWords.contains(word)) result.add(word)
+
+        fun appendPartition(matches: Iterable<String>) {
+            val frequentList = ArrayList<String>()
+            val nonFrequentList = ArrayList<String>()
+            for (word in matches) {
+                if ((frequentWordCounts[word] ?: 0) > 0) {
+                    frequentList.add(word)
+                } else {
+                    nonFrequentList.add(word)
+                }
+            }
+            frequentList.sortWith { a, b ->
+                val ca = frequentWordCounts[a] ?: 0
+                val cb = frequentWordCounts[b] ?: 0
+                cb.compareTo(ca)
+            }
+            result.addAll(frequentList)
+            result.addAll(nonFrequentList)
         }
-        for (word in exactMatches) {
-            if (!frequentWords.contains(word)) result.add(word)
-        }
-        for (word in prefixMatches) {
-            if (frequentWords.contains(word)) result.add(word)
-        }
-        for (word in prefixMatches) {
-            if (!frequentWords.contains(word)) result.add(word)
-        }
+
+        appendPartition(exactMatches)
+        appendPartition(prefixMatches)
         return result
     }
 

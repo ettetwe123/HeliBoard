@@ -329,4 +329,65 @@ class TableImeTest {
         val withMingOnly = table.lookup("a", frequentWords = setOf("明"))
         assertEquals(listOf("日", "曰", "明", "昌", "晶"), withMingOnly)
     }
+
+    @Test
+    fun testFrequentWordCountsOptionAOrdering() {
+        val baseEntries = listOf(
+            TableImeTable.Entry("a", "日"),
+            TableImeTable.Entry("a", "曰"),
+            TableImeTable.Entry("aa", "昌"),
+            TableImeTable.Entry("aaa", "晶"),
+            TableImeTable.Entry("ab", "明")
+        )
+        val table = TableImeTable(baseEntries)
+
+        // Exact: 日 (count 10), 曰 (count 5) -> 日 > 曰
+        // Prefix: 昌 (count 8), 明 (count 2), 晶 (0) -> 昌 > 明 > 晶
+        // Option A: exact matches strictly precede prefix matches!
+        val counts = mapOf(
+            "曰" to 5,
+            "日" to 10,
+            "明" to 2,
+            "昌" to 8
+        )
+        val result = table.lookup("a", frequentWordCounts = counts)
+        assertEquals(listOf("日", "曰", "昌", "明", "晶"), result)
+
+        // If 曰 has higher count than 日
+        val counts2 = mapOf(
+            "曰" to 20,
+            "日" to 10,
+            "明" to 30, // Even though 明 has 30, it is a prefix match so it must NEVER jump ahead of exact matches!
+            "昌" to 5
+        )
+        val result2 = table.lookup("a", frequentWordCounts = counts2)
+        assertEquals(listOf("曰", "日", "明", "昌", "晶"), result2)
+    }
+
+    @Test
+    fun testWordPredictorFrequencyOrdering() {
+        val words = listOf(
+            "香港",
+            "香水",
+            "香腸",
+            "香蕉",
+            "香味"
+        ).sorted()
+        val predictor = helium314.keyboard.latin.tableime.TableImeWordPredictor(words)
+
+        // Default: length/alphabetic
+        val defaultList = predictor.predict("香")
+        assertTrue(defaultList.contains("港"))
+        assertTrue(defaultList.contains("蕉"))
+
+        // With frequency counts: 蕉 (count 10) > 港 (count 3)
+        val counts = mapOf("蕉" to 10, "港" to 3)
+        val sortedList = predictor.predict("香", frequentWordCounts = counts)
+        assertEquals("蕉", sortedList[0])
+        assertEquals("港", sortedList[1])
+        // Remaining unranked ones follow
+        assertTrue(sortedList.contains("水"))
+        assertTrue(sortedList.contains("腸"))
+        assertTrue(sortedList.contains("味"))
+    }
 }
