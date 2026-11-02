@@ -96,7 +96,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
         val colors = Settings.getValues().mColors
         colors.setBackground(this, ColorType.STRIP_BACKGROUND)
-        repeat(SuggestedWords.MAX_SUGGESTIONS) {
+        val maxSuggestionsViews = maxOf(SuggestedWords.MAX_SUGGESTIONS, TableImeSuggestionStripLayoutHelper.MAX_SUGGESTIONS_FOR_TABLE_IME)
+        repeat(maxSuggestionsViews) {
             val word = TextView(context, null, R.attr.suggestionWordStyle)
             word.contentDescription = resources.getString(R.string.spoken_empty_suggestion)
             word.setOnClickListener(this)

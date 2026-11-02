@@ -28,7 +28,7 @@ public class SuggestedWords {
     public static final int NOT_A_SEQUENCE_NUMBER = -1;
 
     // The maximum number of suggestions available.
-    public static final int MAX_SUGGESTIONS = 60;
+    public static final int MAX_SUGGESTIONS = 18;
 
     private static final ArrayList<SuggestedWordInfo> EMPTY_WORD_INFO_LIST = new ArrayList<>(0);
     @NonNull

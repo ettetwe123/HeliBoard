@@ -2074,9 +2074,11 @@ public final class InputLogic {
             // word information from textview.
             return mConnection.getNgramContextFromNthPreviousWord(spacingAndPunctuations, nthPreviousWord);
         }
-        final CharSequence textBeforeCursor = mConnection.getTextBeforeCursor(20, 0);
-        if (textBeforeCursor != null && textBeforeCursor.length() > 0) {
-            return new NgramContext(new NgramContext.WordInfo(textBeforeCursor.toString()));
+        if (TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())) {
+            final CharSequence textBeforeCursor = mConnection.getTextBeforeCursor(20, 0);
+            if (textBeforeCursor != null && textBeforeCursor.length() > 0) {
+                return new NgramContext(new NgramContext.WordInfo(textBeforeCursor.toString()));
+            }
         }
         if (LastComposedWord.NOT_A_COMPOSED_WORD == mLastComposedWord) {
             return NgramContext.BEGINNING_OF_SENTENCE;

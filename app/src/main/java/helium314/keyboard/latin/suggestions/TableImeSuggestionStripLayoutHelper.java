@@ -18,6 +18,7 @@ import helium314.keyboard.latin.tableime.TableImeSuggestedWords;
 import java.util.ArrayList;
 
 public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHelper {
+    public static final int MAX_SUGGESTIONS_FOR_TABLE_IME = 60;
 
     public TableImeSuggestionStripLayoutHelper(
             final Context context,

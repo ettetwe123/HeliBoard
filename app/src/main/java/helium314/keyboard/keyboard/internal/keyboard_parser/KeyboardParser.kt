@@ -17,9 +17,11 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
 import helium314.keyboard.latin.common.isEmoji
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.tableime.TableImeRegistry
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
 import helium314.keyboard.latin.utils.POPUP_KEYS_NUMBER
+import helium314.keyboard.latin.utils.SubtypeLocaleUtils
 import helium314.keyboard.latin.utils.replaceFirst
 import helium314.keyboard.latin.utils.splitAt
 import helium314.keyboard.latin.utils.sumOf
@@ -277,7 +279,15 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             numberRowCopy.forEachIndexed { index, keyData -> keyData.popup.symbol = baseKeys[0].getOrNull(index)?.label }
             baseKeys[0] = numberRowCopy
         } else if (!params.mId.numberRowEnabled && params.mId.element.isAlphabet && !hasBuiltInNumbers()) {
-            if (baseKeys[0].any { it.popup.main != null || !it.popup.relevant.isNullOrEmpty() }) { // first row of baseKeys has any layout popup key
+            val combiningRules = SubtypeLocaleUtils.getCombiningRulesExtraValue(params.mId.subtype.rawSubtype)
+            val isTableIme = TableImeRegistry.isTableIme(combiningRules)
+            if (baseKeys[0].any { it.popup.main != null || !it.popup.relevant.isNullOrEmpty() }
+                && (isTableIme || params.mPopupKeyHintOrder.let {
+                    val layout = it.indexOf(POPUP_KEYS_LAYOUT)
+                    val number = it.indexOf(POPUP_KEYS_NUMBER)
+                    layout != -1 && layout < number
+                })
+            ) {
                 // remove number from labels, to respect explicit layout popup keys (e.g. Cangjie radicals showing QWERTY letters)
                 // and to avoid awkward mix of numbers and others caused by layout popup keys
                 params.mPopupKeyHintOrder.remove(POPUP_KEYS_NUMBER)
