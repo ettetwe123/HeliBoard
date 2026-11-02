@@ -28,6 +28,7 @@ import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.WordData
 import helium314.keyboard.latin.utils.useBackgroundGathering
 import helium314.keyboard.latin.tableime.TableImeRegistry
+import helium314.keyboard.latin.tableime.TableImeSuggestedWords
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -81,18 +82,18 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
     ): SuggestedWords {
         val rawCode = wordComposer.rawComposingCode
         if (rawCode.isEmpty()) {
-            return SuggestedWords.getEmptyInstance(true)
+            return TableImeSuggestedWords.empty(sequenceNumber)
         }
-        val context = Settings.getCurrentContext() ?: return SuggestedWords.getEmptyInstance(true)
+        val context = Settings.getCurrentContext() ?: return TableImeSuggestedWords.empty(sequenceNumber)
         val table = TableImeRegistry.getTable(context, combiningSpec)
-            ?: return SuggestedWords.getEmptyInstance(true)
+            ?: return TableImeSuggestedWords.empty(sequenceNumber)
 
         val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
 
         val candidates = table.lookup(rawCode, includeExtended = includeExtended)
         if (candidates.isEmpty()) {
-            return SuggestedWords.getEmptyInstance(true)
+            return TableImeSuggestedWords.empty(sequenceNumber)
         }
 
         val suggestionsList = ArrayList<SuggestedWordInfo>(candidates.size)
@@ -110,18 +111,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             )
         }
 
-        val firstInfo = suggestionsList[0]
-        return SuggestedWords(
-            suggestionsList,
-            null,
-            firstInfo,
-            true,
-            true,
-            false,
-            InputStyle.NONE,
-            sequenceNumber,
-            true
-        )
+        return TableImeSuggestedWords(suggestionsList, sequenceNumber)
     }
 
     // Retrieves suggestions for non-batch input (typing, recorrection, predictions...)

@@ -44,11 +44,7 @@ import helium314.keyboard.latin.LastComposedWord;
 import helium314.keyboard.latin.LatinIME;
 import helium314.keyboard.latin.NgramContext;
 import helium314.keyboard.latin.RichInputConnection;
-import helium314.keyboard.latin.RichInputMethodManager;
-import helium314.keyboard.latin.RichInputMethodSubtype;
-import helium314.keyboard.latin.tableime.TableImeRegistry;
-import helium314.keyboard.latin.tableime.TableImeTable;
-import java.util.List;
+import helium314.keyboard.latin.tableime.TableImeHandler;
 import helium314.keyboard.latin.SingleDictionaryFacilitator;
 import helium314.keyboard.latin.Suggest;
 import helium314.keyboard.latin.Suggest.OnGetSuggestedWordsCallback;
@@ -356,7 +352,7 @@ public final class InputLogic {
         }
 
         // Space state must be updated before calling updateShiftState
-        if (settingsValues.mAutospaceAfterSuggestion && !TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec()))
+        if (settingsValues.mAutospaceAfterSuggestion && TableImeHandler.shouldAutoSpace(mWordComposer.getCombiningSpec()))
             mSpaceState = SpaceState.PHANTOM;
         else
             mSpaceState = SpaceState.NONE;
@@ -633,7 +629,7 @@ public final class InputLogic {
         if (!suggestedWords.isEmpty()) {
             final SuggestedWordInfo suggestedWordInfo;
             if (suggestedWords.mWillAutoCorrect) {
-                suggestedWordInfo = suggestedWords.getInfo(SuggestedWords.INDEX_OF_AUTO_CORRECTION);
+                suggestedWordInfo = suggestedWords.getAutoCorrectionWordInfo();
             } else {
                 // We can't use suggestedWords.getWord(SuggestedWords.INDEX_OF_TYPED_WORD)
                 // because it may differ from mWordComposer.mTypedWord.
@@ -642,7 +638,7 @@ public final class InputLogic {
             mWordComposer.setAutoCorrection(suggestedWordInfo);
         }
         mSuggestedWords = suggestedWords;
-        final boolean newAutoCorrectionIndicator = suggestedWords.mWillAutoCorrect;
+        final boolean newAutoCorrectionIndicator = !suggestedWords.mIsTableIme && suggestedWords.mWillAutoCorrect;
 
         // Put a blue underline to a word in TextView which will be auto-corrected.
         if (mIsAutoCorrectionIndicatorOn != newAutoCorrectionIndicator && mWordComposer.isComposingWord()) {
@@ -685,7 +681,7 @@ public final class InputLogic {
             setComposingTextInternal(mWordComposer.getTypedWord(), 1);
             inputTransaction.setDidAffectContents();
             inputTransaction.setRequiresUpdateSuggestions();
-        } else if (TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
+        } else if (TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())) {
             mConnection.commitText("", 1);
             inputTransaction.setDidAffectContents();
             inputTransaction.setRequiresUpdateSuggestions();
@@ -907,40 +903,9 @@ public final class InputLogic {
         }
     }
 
-    private void commitFirstCandidateOrCancel(final LatinIME.UIHandler handler, final boolean isEnter) {
-        String firstWord = null;
-        if (mSuggestedWords != null && mSuggestedWords.size() > 0) {
-            firstWord = mSuggestedWords.getInfo(0).mWord;
-        } else if (mWordComposer.isComposingWord()) {
-            final String rawCode = mWordComposer.getRawComposingCode();
-            final String combiningSpec = mWordComposer.getCombiningSpec();
-            if (rawCode != null && !rawCode.isEmpty() && combiningSpec != null) {
-                final Context context = Settings.getCurrentContext();
-                if (context != null) {
-                    final TableImeTable table = TableImeRegistry.INSTANCE.getTable(context, combiningSpec);
-                    if (table != null) {
-                        final RichInputMethodSubtype currentSubtype = RichInputMethodManager.getInstance().getCurrentSubtype();
-                        final boolean includeExtended = currentSubtype != null && currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED);
-                        final List<String> candidates = table.lookup(rawCode, includeExtended);
-                        if (!candidates.isEmpty()) {
-                            firstWord = candidates.get(0);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (firstWord != null) {
-            commitChosenWord(Settings.getValues(), firstWord, LastComposedWord.COMMIT_TYPE_MANUAL_PICK, LastComposedWord.NOT_A_SEPARATOR);
-            mSpaceState = SpaceState.NONE;
-        } else {
-            if (isEnter) {
-                commitChosenWord(Settings.getValues(), mWordComposer.getTypedWord(), LastComposedWord.COMMIT_TYPE_USER_TYPED_WORD, LastComposedWord.NOT_A_SEPARATOR);
-                mSpaceState = SpaceState.NONE;
-            } else {
-                return;
-            }
-        }
+    public void commitTableImeWord(final String text, final int commitType, final LatinIME.UIHandler handler) {
+        commitChosenWord(Settings.getValues(), text, commitType, LastComposedWord.NOT_A_SEPARATOR);
+        mSpaceState = SpaceState.NONE;
         mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
         handler.cancelUpdateSuggestionStrip();
     }
@@ -957,8 +922,7 @@ public final class InputLogic {
     private void handleNonFunctionalEvent(final Event event, final InputTransaction inputTransaction, final LatinIME.UIHandler handler) {
         inputTransaction.setDidAffectContents();
         if (event.getCodePoint() == Constants.CODE_ENTER) {
-            if (mWordComposer.isComposingWord() && TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
-                commitFirstCandidateOrCancel(handler, true);
+            if (TableImeHandler.handleEnter(this, mWordComposer, mSuggestedWords, handler)) {
                 return;
             }
             final EditorInfo editorInfo = getCurrentInputEditorInfo();
@@ -1001,9 +965,8 @@ public final class InputLogic {
             final InputTransaction inputTransaction,
             final LatinIME.UIHandler handler) {
         final int codePoint = event.getCodePoint();
-        if (mWordComposer.isComposingWord() && TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())) {
-            if (codePoint == Constants.CODE_SPACE) {
-                commitFirstCandidateOrCancel(handler, false);
+        if (codePoint == Constants.CODE_SPACE) {
+            if (TableImeHandler.handleSpace(this, mWordComposer, mSuggestedWords, handler)) {
                 return;
             }
         }
@@ -1794,8 +1757,7 @@ public final class InputLogic {
                 // Show new suggestions if we have at least one. Otherwise keep the old
                 // suggestions with the new typed word. Exception: if the length of the
                 // typed word is <= 1 (after a deletion typically) we clear old suggestions.
-                if (suggestedWords.mIsTableIme
-                        || TableImeRegistry.INSTANCE.isTableIme(mWordComposer.getCombiningSpec())
+                if (TableImeHandler.shouldUpdateSuggestions(suggestedWords, mWordComposer.getCombiningSpec())
                         || suggestedWords.size() > 1
                         || typedWordString.length() <= 1) {
                     holder.set(suggestedWords);
@@ -1836,6 +1798,8 @@ public final class InputLogic {
         if (!settingsValues.mSpacingAndPunctuations.mCurrentLanguageHasSpacesOrWordIterator
                 // If no suggestions are requested, don't try restarting suggestions.
                 || !settingsValues.needsToLookupSuggestions()
+                // Table IME does not support Latin recorrection on committed text.
+                || TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())
                 // If we are currently in a batch input, we must not resume suggestions, or the result
                 // of the batch input will replace the new composition. This may happen in the corner case
                 // that the app moves the cursor on its own accord during a batch input.
@@ -2236,6 +2200,9 @@ public final class InputLogic {
      */
     // TODO: Shouldn't this go in some *Utils class instead?
     private CharSequence getTextWithUnderline(final String text) {
+        if (TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())) {
+            return text;
+        }
         return mIsAutoCorrectionIndicatorOn
                 ? SuggestionSpanUtilsKt.getTextWithAutoCorrectionIndicatorUnderline(
                         mLatinIME, text, getDictionaryFacilitatorLocale())

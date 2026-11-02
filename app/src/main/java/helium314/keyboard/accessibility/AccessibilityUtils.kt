@@ -98,7 +98,7 @@ class AccessibilityUtils private constructor() {
      */
     fun setAutoCorrection(suggestedWords: SuggestedWords) {
         if (suggestedWords.mWillAutoCorrect) {
-            mAutoCorrectionWord = suggestedWords.getWord(SuggestedWords.INDEX_OF_AUTO_CORRECTION)
+            mAutoCorrectionWord = suggestedWords.autoCorrectionWord
             val typedWordInfo = suggestedWords.mTypedWordInfo
             mTypedWord = typedWordInfo?.mWord
         } else {

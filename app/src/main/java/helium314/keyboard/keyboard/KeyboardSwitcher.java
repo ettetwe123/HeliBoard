@@ -48,6 +48,8 @@ import helium314.keyboard.latin.RichInputMethodManager;
 import helium314.keyboard.latin.RichInputMethodSubtype;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsKt;
+import helium314.keyboard.latin.SuggestedWords;
+import helium314.keyboard.latin.tableime.TableImeCandidatesView;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.suggestions.SuggestionStripView;
 import helium314.keyboard.latin.utils.CapsModeUtils;
@@ -75,6 +77,7 @@ public final class KeyboardSwitcher {
     private SuggestionStripView mSuggestionStripView;
     private FrameLayout mStripContainer;
     private ClipboardHistoryView mClipboardHistoryView;
+    private TableImeCandidatesView mTableImeCandidatesView;
     private TextView mFakeToastView;
     private ImageView mBackgroundGatheringIndicator;
     private LatinIME mLatinIME;
@@ -250,6 +253,9 @@ public final class KeyboardSwitcher {
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
+        if (mTableImeCandidatesView != null) {
+            mTableImeCandidatesView.setVisibility(View.GONE);
+        }
     }
 
     public void toggleLayout(@NonNull LayoutDirective.Utility layout, int autoCapsFlags, @Nullable RecapitalizeMode recapitalizeMode) {
@@ -313,6 +319,9 @@ public final class KeyboardSwitcher {
 
                 mClipboardHistoryView.stopClipboardHistory();
                 mClipboardHistoryView.setVisibility(View.GONE);
+            if (mTableImeCandidatesView != null) {
+                mTableImeCandidatesView.setVisibility(View.GONE);
+            }
 
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.VISIBLE);
@@ -473,8 +482,33 @@ public final class KeyboardSwitcher {
         return mClipboardHistoryView != null && mClipboardHistoryView.isShown();
     }
 
+    public boolean isTableImeCandidatesShowing() {
+        return mTableImeCandidatesView != null && mTableImeCandidatesView.getVisibility() == View.VISIBLE;
+    }
+
+    public void showTableImeCandidates(
+            final SuggestedWords words,
+            final kotlin.jvm.functions.Function1<? super SuggestedWords.SuggestedWordInfo, kotlin.Unit> onSelectCandidate
+    ) {
+        if (mTableImeCandidatesView == null) return;
+        mKeyboardView.setVisibility(View.GONE);
+        mTableImeCandidatesView.setCandidates(words, onSelectCandidate);
+        mTableImeCandidatesView.setVisibility(View.VISIBLE);
+    }
+
+    public void hideTableImeCandidates() {
+        if (mTableImeCandidatesView != null && mTableImeCandidatesView.getVisibility() == View.VISIBLE) {
+            mTableImeCandidatesView.setVisibility(View.GONE);
+            mKeyboardView.setVisibility(View.VISIBLE);
+        }
+    }
+
+    public TableImeCandidatesView getTableImeCandidatesView() {
+        return mTableImeCandidatesView;
+    }
+
     public boolean isShowingPopupKeysPanel() {
-        if (isShowingEmojiPalettes() || isShowingClipboardHistory()) {
+        if (isShowingEmojiPalettes() || isShowingClipboardHistory() || isTableImeCandidatesShowing()) {
             return false;
         }
         return mKeyboardView.isShowingPopupKeysPanel();
@@ -489,6 +523,8 @@ public final class KeyboardSwitcher {
             return mEmojiPalettesView;
         } else if (isShowingClipboardHistory()) {
             return mClipboardHistoryView;
+        } else if (isTableImeCandidatesShowing()) {
+            return mTableImeCandidatesView;
         }
         return mKeyboardView;
     }
@@ -550,6 +586,7 @@ public final class KeyboardSwitcher {
         mMainKeyboardFrame = mCurrentInputView.findViewById(R.id.main_keyboard_frame);
         mEmojiPalettesView = mCurrentInputView.findViewById(R.id.emoji_palettes_view);
         mClipboardHistoryView = mCurrentInputView.findViewById(R.id.clipboard_history_view);
+        mTableImeCandidatesView = mCurrentInputView.findViewById(R.id.table_ime_candidates_view);
         mFakeToastView = mCurrentInputView.findViewById(R.id.fakeToast);
 
         mKeyboardViewWrapper = mCurrentInputView.findViewById(R.id.keyboard_view_wrapper);
@@ -649,6 +686,9 @@ public final class KeyboardSwitcher {
             mClipboardStripScrollView.setVisibility(View.GONE);
             mEmojiTabStripView.setVisibility(View.VISIBLE);
             mClipboardHistoryView.setVisibility(View.GONE);
+            if (mTableImeCandidatesView != null) {
+                mTableImeCandidatesView.setVisibility(View.GONE);
+            }
             mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
                 mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
             mEmojiPalettesView.setVisibility(View.VISIBLE);

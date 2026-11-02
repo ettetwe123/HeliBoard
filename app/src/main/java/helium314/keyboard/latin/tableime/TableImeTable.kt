@@ -21,7 +21,7 @@ class TableImeTable(
     fun lookup(
         code: String,
         includeExtended: Boolean = false,
-        maxCandidates: Int = 100
+        maxCandidates: Int = 500
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()

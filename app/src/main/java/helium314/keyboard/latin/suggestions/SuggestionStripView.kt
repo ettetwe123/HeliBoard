@@ -23,6 +23,7 @@ import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -117,8 +118,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val toolbar: ViewGroup = findViewById(R.id.toolbar)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
+    private val suggestionsStripScroll: HorizontalScrollView = findViewById(R.id.suggestions_strip_scroll)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
     private val toolbarExpandKey = findViewById<ImageButton>(R.id.suggestions_strip_toolbar_key)
+    private val dropdownKey = findViewById<ImageButton>(R.id.suggestions_strip_dropdown_key)
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
     private val toolbarArrowIcon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context)
     private val defaultToolbarBackground: Drawable = toolbarExpandKey.background
@@ -142,6 +145,16 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         colors.setBackground(toolbarExpandKey, ColorType.STRIP_BACKGROUND) // necessary because background is re-used for defaultToolbarBackground
         colors.setColor(toolbarExpandKey, ColorType.TOOL_BAR_EXPAND_KEY)
         colors.setColor(toolbarExpandKey.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+
+        // dropdown key for table IME candidate expansion
+        dropdownKey.layoutParams.height = toolbarHeight
+        dropdownKey.layoutParams.width = toolbarHeight
+        colors.setBackground(dropdownKey, ColorType.STRIP_BACKGROUND)
+        colors.setColor(dropdownKey, ColorType.TOOL_BAR_EXPAND_KEY)
+        colors.setColor(dropdownKey.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+        dropdownKey.setOnClickListener {
+            toggleTableImeCandidatesView()
+        }
 
         // background indicator for pinned keys
         val color = colors.get(ColorType.TOOL_BAR_KEY_ENABLED_BACKGROUND) or -0x1000000 // ignore alpha (in Java this is more readable 0xFF000000)
@@ -229,16 +242,20 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
         layoutDirection = newLayoutDirection
         suggestionsStrip.layoutDirection = newLayoutDirection
+        suggestionsStripScroll.layoutDirection = newLayoutDirection
     }
 
     fun setToolbarVisibility(toolbarVisible: Boolean) {
         pinnedKeys.isVisible = !toolbarVisible
+        suggestionsStripScroll.isVisible = !toolbarVisible
         suggestionsStrip.isVisible = !toolbarVisible
         toolbarContainer.isVisible = toolbarVisible
+        if (toolbarVisible) dropdownKey.isVisible = false
+        else if (suggestedWords.mIsTableIme && !suggestedWords.isEmpty) dropdownKey.isVisible = true
 
         if (DEBUG_SUGGESTIONS) {
             for (view in debugInfoViews) {
-                view.visibility = suggestionsStrip.visibility
+                view.visibility = suggestionsStripScroll.visibility
             }
         }
 
@@ -246,6 +263,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
+        val wasCandidatesShowing = KeyboardSwitcher.getInstance().isTableImeCandidatesShowing
         clear()
         setRtl(isRtlLanguage)
         suggestedWords = suggestions
@@ -253,6 +271,27 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             context, suggestedWords, suggestionsStrip, this
         )
         isExternalSuggestionVisible = false
+        suggestionsStripScroll.scrollTo(0, 0)
+        if (suggestedWords.mIsTableIme && !suggestedWords.isEmpty) {
+            setToolbarVisibility(false)
+            suggestionsStripScroll.isVisible = true
+            suggestionsStrip.isVisible = true
+            dropdownKey.isVisible = true
+            if (wasCandidatesShowing) {
+                KeyboardSwitcher.getInstance().showTableImeCandidates(suggestedWords) { info ->
+                    listener.pickSuggestionManually(info)
+                    KeyboardSwitcher.getInstance().hideTableImeCandidates()
+                    dropdownKey.scaleY = 1f
+                }
+                dropdownKey.scaleY = -1f
+            } else {
+                dropdownKey.scaleY = 1f
+            }
+        } else {
+            dropdownKey.isVisible = false
+            dropdownKey.scaleY = 1f
+            KeyboardSwitcher.getInstance().hideTableImeCandidates()
+        }
         updateKeys()
     }
 
@@ -289,6 +328,27 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     fun dismissMoreSuggestionsPanel() {
         moreSuggestionsView.dismissPopupKeysPanel()
+        KeyboardSwitcher.getInstance().hideTableImeCandidates()
+        dropdownKey.scaleY = 1f
+    }
+
+    fun resetDropdownKey() {
+        dropdownKey.scaleY = 1f
+    }
+
+    private fun toggleTableImeCandidatesView() {
+        val switcher = KeyboardSwitcher.getInstance()
+        if (switcher.isTableImeCandidatesShowing) {
+            switcher.hideTableImeCandidates()
+            dropdownKey.scaleY = 1f
+        } else {
+            switcher.showTableImeCandidates(suggestedWords) { info ->
+                listener.pickSuggestionManually(info)
+                switcher.hideTableImeCandidates()
+                dropdownKey.scaleY = 1f
+            }
+            dropdownKey.scaleY = -1f
+        }
     }
 
     // overrides: necessarily public, but not used from outside
@@ -303,8 +363,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     override fun onVisibilityChanged(view: View, visibility: Int) {
         super.onVisibilityChanged(view, visibility)
         // workaround for a bug with inline suggestions views that just keep showing up otherwise, https://github.com/HeliBorg/HeliBoard/pull/386
-        if (view === this)
+        if (view === this) {
+            suggestionsStripScroll.visibility = visibility
             suggestionsStrip.visibility = visibility
+        }
     }
 
     override fun onDetachedFromWindow() {
@@ -390,6 +452,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     @SuppressLint("ClickableViewAccessibility") // no need for View#performClick, we only return false mostly anyway
     private fun onLongClickSuggestion(wordView: TextView): Boolean {
+        if (suggestedWords.mIsTableIme) {
+            toggleTableImeCandidatesView()
+            return true
+        }
         var showIcon = true
         if (wordView.tag is Int) {
             val index = wordView.tag as Int
@@ -481,7 +547,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             suggestedWords.mWillAutoCorrect, suggestedWords.mIsObsoleteSuggestions, suggestedWords.mInputStyle, suggestedWords.mSequenceNumber
         )
         setSuggestions(newSuggestedWords, direction != 1)
-        suggestionsStrip.isVisible = true
+        suggestionsStripScroll.isVisible = true
 
         // Show the toolbar if no suggestions are left and the "Auto show toolbar" setting is enabled
         if (this.suggestedWords.isEmpty && Settings.getValues().mAutoShowToolbar) {
@@ -491,9 +557,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     private fun clear() {
         suggestionsStrip.removeAllViews()
+        dropdownKey.isVisible = false
+        suggestionsStripScroll.scrollTo(0, 0)
         if (DEBUG_SUGGESTIONS) removeAllDebugInfoViews()
-        if (!toolbarContainer.isVisible)
+        if (!toolbarContainer.isVisible) {
+            suggestionsStripScroll.isVisible = true
             suggestionsStrip.isVisible = true
+        }
         dismissMoreSuggestionsPanel()
         for (word in wordViews) {
             word.setOnTouchListener(null)
@@ -529,7 +599,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         toolbarExpandKey.setOnClickListener(if (!toolbarIsExpandable) null else this)
-        pinnedKeys.visibility = suggestionsStrip.visibility
+        pinnedKeys.visibility = suggestionsStripScroll.visibility
         isExternalSuggestionVisible = false
     }
 

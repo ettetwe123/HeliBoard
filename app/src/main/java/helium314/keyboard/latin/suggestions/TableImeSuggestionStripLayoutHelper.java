@@ -5,15 +5,18 @@ import android.content.Context;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.SuggestedWords;
 
 import java.util.ArrayList;
 
 public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHelper {
-    public static final int CJK_SUGGESTIONS_COUNT_IN_STRIP = 5;
 
     public TableImeSuggestionStripLayoutHelper(
             final Context context,
@@ -24,36 +27,59 @@ public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHe
             final ArrayList<TextView> debugInfoViews
     ) {
         super(context, attrs, defStyle, wordViews, dividerViews, debugInfoViews);
-        mSuggestionsCountInStrip = CJK_SUGGESTIONS_COUNT_IN_STRIP;
-        mCenterPositionInStrip = mSuggestionsCountInStrip / 2; // = 2
-        mTypedWordPositionWhenAutocorrect = mCenterPositionInStrip - 1; // = 1
-        mCenterSuggestionWeight = 1.0f / mSuggestionsCountInStrip;
     }
 
     @Override
-    protected float getSuggestionWeight(final int positionInStrip) {
-        // Equal width for Chinese square characters
-        return 1.0f / mSuggestionsCountInStrip;
-    }
-
-    @Override
-    protected int getPositionInSuggestionStrip(
-            final int indexInSuggestedWords,
-            final SuggestedWords suggestedWords
+    public int layoutAndReturnStartIndexOfMoreSuggestions(
+            final Context context,
+            final SuggestedWords suggestedWords,
+            final ViewGroup stripView,
+            final ViewGroup placerView
     ) {
-        // Index 0 (Best exact match, e.g. "好") goes to the center slot for space-commit
-        if (indexInSuggestedWords == 0) {
-            return mCenterPositionInStrip; // 2
-        } else if (indexInSuggestedWords == 1) {
-            return mCenterPositionInStrip - 1; // 1 (left of center)
-        } else if (indexInSuggestedWords == 2) {
-            return mCenterPositionInStrip + 1; // 3 (right of center)
-        } else if (indexInSuggestedWords == 3) {
-            return mCenterPositionInStrip - 2; // 0 (far left)
-        } else if (indexInSuggestedWords == 4) {
-            return mCenterPositionInStrip + 2; // 4 (far right)
+        final int totalAvailable = Math.min(suggestedWords.size(), mWordViews.size());
+
+        // Clear previous state of all word views
+        for (int i = 0; i < mWordViews.size(); i++) {
+            final TextView wordView = mWordViews.get(i);
+            wordView.setText(null);
+            wordView.setTag(null);
         }
-        return -1; // Overflow candidates go into MoreSuggestions panel
+
+        final int horizontalPadding = (int) (14 * context.getResources().getDisplayMetrics().density);
+
+        for (int index = 0; index < totalAvailable; index++) {
+            if (index != 0 && index < mDividerViews.size()) {
+                final View divider = mDividerViews.get(index);
+                stripView.addView(divider);
+                final LinearLayout.LayoutParams dividerParams = (LinearLayout.LayoutParams) divider.getLayoutParams();
+                if (dividerParams != null) {
+                    dividerParams.gravity = Gravity.CENTER;
+                }
+            }
+
+            final TextView wordView = mWordViews.get(index);
+            final CharSequence styledWord = getStyledSuggestedWord(suggestedWords, index);
+            wordView.setText(styledWord);
+            wordView.setTag(index);
+            wordView.setTextColor(getSuggestionTextColor(suggestedWords, index));
+            wordView.setPadding(horizontalPadding, 0, horizontalPadding, 0);
+            wordView.setEnabled(true);
+            wordView.setVisibility(View.VISIBLE);
+            wordView.setTextScaleX(1.0f);
+            wordView.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
+            wordView.setGravity(Gravity.CENTER);
+            KeyboardTypeface.applyToTextView(wordView);
+
+            stripView.addView(wordView);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            wordView.setLayoutParams(lp);
+        }
+
+        mMoreSuggestionsAvailable = (suggestedWords.size() > 0);
+        return 0;
     }
 
     @Override
@@ -65,7 +91,7 @@ public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHe
             return null;
         }
         final String word = suggestedWords.getLabel(indexInSuggestedWords);
-        // Only the center suggestion (index 0) MUST be bold!
+        // Candidate 0 (left-most) is the primary match committed by space -> BOLD!
         if (indexInSuggestedWords == 0) {
             final Spannable spannedWord = new SpannableString(word);
             addStyleSpan(spannedWord, BOLD_SPAN);
@@ -83,5 +109,13 @@ public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHe
             return mColorAutoCorrect;
         }
         return mColorSuggested;
+    }
+
+    @Override
+    protected int getPositionInSuggestionStrip(
+            final int indexInSuggestedWords,
+            final SuggestedWords suggestedWords
+    ) {
+        return indexInSuggestedWords;
     }
 }

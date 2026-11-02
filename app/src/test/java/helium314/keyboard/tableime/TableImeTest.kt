@@ -139,6 +139,27 @@ class TableImeTest {
         println("Lookup vnd: $resVnd")
         assertTrue(resVnd.contains("好"))
         assertEquals("好", resVnd[0])
+        val resKokr = table.lookup("kokr")
+        println("Lookup kokr: $resKokr")
+        assertTrue(resKokr.contains("痴"))
+        assertEquals("痴", resKokr[0])
+    }
+
+    @Test
+    fun testTableImeSuggestedWordsSingleCandidate() {
+        val list = arrayListOf(
+            helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo(
+                "痴", "", 1000, helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo.KIND_CORRECTION,
+                helium314.keyboard.latin.dictionary.Dictionary.DICTIONARY_USER_TYPED, 0, -1
+            )
+        )
+        val tableSuggestedWords = helium314.keyboard.latin.tableime.TableImeSuggestedWords(list, 1)
+        assertEquals(1, tableSuggestedWords.size())
+        assertEquals(1, tableSuggestedWords.wordCountToShow)
+        // Ensure auto-correction candidate is index 0 and doesn't crash on size 1!
+        assertEquals("痴", tableSuggestedWords.autoCorrectionWord)
+        assertEquals("痴", tableSuggestedWords.autoCorrectionWordInfo?.mWord)
+        assertEquals("痴", tableSuggestedWords.autoCommitCandidate?.mWord)
     }
 
     @Test
@@ -147,5 +168,25 @@ class TableImeTest {
         assertFalse(emptyNormal.mIsTableIme)
         val emptyTable = helium314.keyboard.latin.SuggestedWords.getEmptyInstance(true)
         assertTrue(emptyTable.mIsTableIme)
+    }
+
+    @Test
+    fun testTableImeHandlerDecoupling() {
+        assertTrue(helium314.keyboard.latin.tableime.TableImeHandler.isTableIme("cangjie"))
+        assertFalse(helium314.keyboard.latin.tableime.TableImeHandler.isTableIme("bn_khipro"))
+        assertFalse(helium314.keyboard.latin.tableime.TableImeHandler.isTableIme(null))
+
+        assertFalse(helium314.keyboard.latin.tableime.TableImeHandler.shouldAutoSpace("cangjie"))
+        assertTrue(helium314.keyboard.latin.tableime.TableImeHandler.shouldAutoSpace("en"))
+        assertTrue(helium314.keyboard.latin.tableime.TableImeHandler.shouldAutoSpace(null))
+
+        val list = arrayListOf(
+            helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo(
+                "痴", "", 1000, helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo.KIND_CORRECTION,
+                helium314.keyboard.latin.dictionary.Dictionary.DICTIONARY_USER_TYPED, 0, -1
+            )
+        )
+        val tableSuggestedWords = helium314.keyboard.latin.tableime.TableImeSuggestedWords(list, 1)
+        assertTrue(helium314.keyboard.latin.tableime.TableImeHandler.shouldUpdateSuggestions(tableSuggestedWords, "cangjie"))
     }
 }

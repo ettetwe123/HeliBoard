@@ -884,7 +884,8 @@ public class LatinIME extends InputMethodService implements
                 // initialSelStart and initialSelEnd sometimes are lying. Make a best effort to
                 // work around this bug.
                 mInputLogic.mConnection.tryFixIncorrectCursorPosition();
-                if (mInputLogic.mConnection.isCursorTouchingWord(currentSettingsValues.mSpacingAndPunctuations, true)) {
+                if (!TableImeRegistry.INSTANCE.isTableIme(combiningRules)
+                        && mInputLogic.mConnection.isCursorTouchingWord(currentSettingsValues.mSpacingAndPunctuations, true)) {
                     mHandler.postResumeSuggestions(true /* shouldDelay */);
                 }
                 needToCallLoadKeyboardLater = false;
@@ -1420,21 +1421,22 @@ public class LatinIME extends InputMethodService implements
             return;
         }
 
+        final boolean isTableImeSuggestions = suggestedWords.mIsTableIme && !suggestedWords.isEmpty();
         final boolean isEmptyApplicationSpecifiedCompletions =
                 currentSettingsValues.mInputAttributes.mApplicationSpecifiedCompletionOn
                         && suggestedWords.isEmpty();
-        final boolean noSuggestionsFromDictionaries = suggestedWords.isEmpty()
+        final boolean noSuggestionsFromDictionaries = !isTableImeSuggestions && (suggestedWords.isEmpty()
                 || suggestedWords.isPunctuationSuggestions()
-                || isEmptyApplicationSpecifiedCompletions;
+                || isEmptyApplicationSpecifiedCompletions);
 
-        if (currentSettingsValues.mSuggestionsEnabled
+        if (isTableImeSuggestions
+                || currentSettingsValues.mSuggestionsEnabled
                 || currentSettingsValues.mInputAttributes.mApplicationSpecifiedCompletionOn
-                // We should clear the contextual strip if there is no suggestion from dictionaries.
                 || noSuggestionsFromDictionaries) {
             mSuggestionStripView.setSuggestions(suggestedWords,
                     mRichImm.getCurrentSubtype().isRtlSubtype());
             // Auto hide the toolbar if dictionary suggestions are available
-            if (currentSettingsValues.mAutoHideToolbar && !noSuggestionsFromDictionaries) {
+            if (isTableImeSuggestions || (currentSettingsValues.mAutoHideToolbar && !noSuggestionsFromDictionaries)) {
                 mSuggestionStripView.setToolbarVisibility(false);
             }
         }
@@ -1605,6 +1607,15 @@ public class LatinIME extends InputMethodService implements
     // Hooks for hardware keyboard
     @Override
     public boolean onKeyDown(final int keyCode, final KeyEvent keyEvent) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (mKeyboardSwitcher != null && mKeyboardSwitcher.isTableImeCandidatesShowing()) {
+                mKeyboardSwitcher.hideTableImeCandidates();
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.resetDropdownKey();
+                }
+                return true;
+            }
+        }
         if (mKeyboardActionListener.onKeyDown(keyCode, keyEvent))
             return true;
         return super.onKeyDown(keyCode, keyEvent);

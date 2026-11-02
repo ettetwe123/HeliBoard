@@ -277,14 +277,9 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             numberRowCopy.forEachIndexed { index, keyData -> keyData.popup.symbol = baseKeys[0].getOrNull(index)?.label }
             baseKeys[0] = numberRowCopy
         } else if (!params.mId.numberRowEnabled && params.mId.element.isAlphabet && !hasBuiltInNumbers()) {
-            if (baseKeys[0].any { it.popup.main != null || !it.popup.relevant.isNullOrEmpty() } // first row of baseKeys has any layout popup key
-                && params.mPopupKeyHintOrder.let {
-                    val layout = it.indexOf(POPUP_KEYS_LAYOUT)
-                    val number = it.indexOf(POPUP_KEYS_NUMBER)
-                    layout != -1 && layout < number // layout before number label
-                }
-            ) {
-                // remove number from labels, to avoid awkward mix of numbers and others caused by layout popup keys
+            if (baseKeys[0].any { it.popup.main != null || !it.popup.relevant.isNullOrEmpty() }) { // first row of baseKeys has any layout popup key
+                // remove number from labels, to respect explicit layout popup keys (e.g. Cangjie radicals showing QWERTY letters)
+                // and to avoid awkward mix of numbers and others caused by layout popup keys
                 params.mPopupKeyHintOrder.remove(POPUP_KEYS_NUMBER)
             }
             // add number to the first row

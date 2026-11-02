@@ -28,7 +28,7 @@ public class SuggestedWords {
     public static final int NOT_A_SEQUENCE_NUMBER = -1;
 
     // The maximum number of suggestions available.
-    public static final int MAX_SUGGESTIONS = 18;
+    public static final int MAX_SUGGESTIONS = 60;
 
     private static final ArrayList<SuggestedWordInfo> EMPTY_WORD_INFO_LIST = new ArrayList<>(0);
     @NonNull
@@ -236,6 +236,22 @@ public class SuggestedWords {
         if (mSuggestedWordInfoList.size() <= 0) return null;
         final SuggestedWordInfo candidate = mSuggestedWordInfoList.get(0);
         return candidate.isEligibleForAutoCommit() ? candidate : null;
+    }
+
+    @Nullable
+    public SuggestedWordInfo getAutoCorrectionWordInfo() {
+        if (!mWillAutoCorrect) return null;
+        if (mIsTableIme) {
+            return mSuggestedWordInfoList.isEmpty() ? null : mSuggestedWordInfoList.get(0);
+        }
+        return mSuggestedWordInfoList.size() > INDEX_OF_AUTO_CORRECTION
+                ? mSuggestedWordInfoList.get(INDEX_OF_AUTO_CORRECTION) : null;
+    }
+
+    @Nullable
+    public String getAutoCorrectionWord() {
+        final SuggestedWordInfo info = getAutoCorrectionWordInfo();
+        return info == null ? null : info.mWord;
     }
 
     // non-final for testability.

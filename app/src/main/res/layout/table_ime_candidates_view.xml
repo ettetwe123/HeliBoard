@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<helium314.keyboard.latin.tableime.TableImeCandidatesView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_gravity="bottom"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/table_ime_candidates_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="vertical"
+        android:overScrollMode="always" />
+
+</helium314.keyboard.latin.tableime.TableImeCandidatesView>

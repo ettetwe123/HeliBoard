@@ -1,34 +1,36 @@
 [
   [
-    { "code": 113, "label": "手", "popup": { "main": { "label": "q" } } },
-    { "code": 119, "label": "田", "popup": { "main": { "label": "w" } } },
-    { "code": 101, "label": "水", "popup": { "main": { "label": "e" } } },
-    { "code": 114, "label": "口", "popup": { "main": { "label": "r" } } },
-    { "code": 116, "label": "廿", "popup": { "main": { "label": "t" } } },
-    { "code": 121, "label": "卜", "popup": { "main": { "label": "y" } } },
-    { "code": 117, "label": "山", "popup": { "main": { "label": "u" } } },
-    { "code": 105, "label": "戈", "popup": { "main": { "label": "i" } } },
-    { "code": 111, "label": "人", "popup": { "main": { "label": "o" } } },
-    { "code": 112, "label": "心", "popup": { "main": { "label": "p" } } }
+    { "code": 113, "label": "手", "popup": { "main": { "label": "？" } } },
+    { "code": 119, "label": "田", "popup": { "main": { "label": "$" } } },
+    { "code": 101, "label": "水", "popup": { "main": { "label": "～" } } },
+    { "code": 114, "label": "口", "popup": { "main": { "label": "＃" } } },
+    { "code": 116, "label": "廿", "popup": { "main": { "label": "『" } } },
+    { "code": 121, "label": "卜", "popup": { "main": { "label": "』" } } },
+    { "code": 117, "label": "山", "popup": { "main": { "label": "＿" } } },
+    { "code": 105, "label": "戈", "popup": { "main": { "label": "！" } } },
+    { "code": 111, "label": "人", "popup": { "main": { "label": "。" } } },
+    { "code": 112, "label": "心", "popup": { "main": { "label": "％" } } }
   ],
   [
-    { "code": 97, "label": "日", "popup": { "main": { "label": "a" } } },
-    { "code": 115, "label": "尸", "popup": { "main": { "label": "s" } } },
-    { "code": 100, "label": "木", "popup": { "main": { "label": "d" } } },
-    { "code": 102, "label": "火", "popup": { "main": { "label": "f" } } },
-    { "code": 103, "label": "土", "popup": { "main": { "label": "g" } } },
-    { "code": 104, "label": "竹", "popup": { "main": { "label": "h" } } },
-    { "code": 106, "label": "十", "popup": { "main": { "label": "j" } } },
-    { "code": 107, "label": "大", "popup": { "main": { "label": "k" } } },
-    { "code": 108, "label": "中", "popup": { "main": { "label": "l" } } }
+    { "code": 97, "label": "日", "popup": { "main": { "label": "（" } } },
+    { "code": 115, "label": "尸", "popup": { "main": { "label": "、" } } },
+    { "code": 100, "label": "木", "popup": { "main": { "label": "）" } } },
+    { "code": 102, "label": "火", "popup": { "main": { "label": "；" } } },
+    { "code": 103, "label": "土", "popup": { "main": { "label": "「" } } },
+    { "code": 104, "label": "竹", "popup": { "main": { "label": "——" } } },
+    { "code": 106, "label": "十", "popup": { "main": { "label": "」" } } },
+    { "code": 107, "label": "大", "popup": { "main": { "label": "〈" } } },
+    { "code": 108, "label": "中", "popup": { "main": { "label": "〉" } } }
   ],
   [
-    { "code": 122, "label": "重", "popup": { "main": { "label": "z" } } },
-    { "code": 120, "label": "難", "popup": { "main": { "label": "x" } } },
-    { "code": 99, "label": "金", "popup": { "main": { "label": "c" } } },
-    { "code": 118, "label": "女", "popup": { "main": { "label": "v" } } },
-    { "code": 98, "label": "月", "popup": { "main": { "label": "b" } } },
-    { "code": 110, "label": "弓", "popup": { "main": { "label": "n" } } },
-    { "code": 109, "label": "一", "popup": { "main": { "label": "m" } } }
+    { "type": "placeholder", "width": 0.1125 },
+    { "code": 122, "label": "重", "popup": { "main": { "label": "／" }, "relevant": [ { "label": "＠" } ] } },
+    { "code": 120, "label": "難", "popup": { "main": { "label": "……" } } },
+    { "code": 99, "label": "金", "popup": { "main": { "label": "，" } } },
+    { "code": 118, "label": "女", "popup": { "main": { "label": "《" } } },
+    { "code": 98, "label": "月", "popup": { "main": { "label": "》" } } },
+    { "code": 110, "label": "弓", "popup": { "main": { "label": "．" } } },
+    { "code": 109, "label": "一", "popup": { "main": { "label": "：" } } },
+    { "type": "placeholder", "width": 0.0375 }
   ]
 ]

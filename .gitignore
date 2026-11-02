@@ -15,6 +15,7 @@ tools/*.txt
 *.patch
 *.diff
 *.sh
+*.dict.yaml
 
 # Editor and agent directories
 .claude/
