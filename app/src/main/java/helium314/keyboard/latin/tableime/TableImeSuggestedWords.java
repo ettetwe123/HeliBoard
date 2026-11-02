@@ -10,10 +10,19 @@ import helium314.keyboard.latin.SuggestedWords;
 import java.util.ArrayList;
 
 public class TableImeSuggestedWords extends SuggestedWords {
+    private final boolean mIsPrediction;
 
     public TableImeSuggestedWords(
             @NonNull final ArrayList<SuggestedWordInfo> candidates,
             final int sequenceNumber
+    ) {
+        this(candidates, sequenceNumber, false);
+    }
+
+    public TableImeSuggestedWords(
+            @NonNull final ArrayList<SuggestedWordInfo> candidates,
+            final int sequenceNumber,
+            final boolean isPrediction
     ) {
         super(
                 candidates,
@@ -22,14 +31,19 @@ public class TableImeSuggestedWords extends SuggestedWords {
                 !candidates.isEmpty() /* typedWordValid */,
                 false /* willAutoCorrect: disable auto-correction underline (blue highlight) */,
                 false /* isObsoleteSuggestions */,
-                InputStyle.NONE,
+                isPrediction ? InputStyle.PREDICTION : InputStyle.NONE,
                 sequenceNumber,
                 true /* isTableIme */
         );
+        mIsPrediction = isPrediction;
     }
 
     public static TableImeSuggestedWords empty(final int sequenceNumber) {
-        return new TableImeSuggestedWords(new ArrayList<>(0), sequenceNumber);
+        return new TableImeSuggestedWords(new ArrayList<>(0), sequenceNumber, false);
+    }
+
+    public boolean isPrediction() {
+        return mIsPrediction;
     }
 
     @Override
@@ -40,18 +54,21 @@ public class TableImeSuggestedWords extends SuggestedWords {
     @Nullable
     @Override
     public SuggestedWordInfo getAutoCorrectionWordInfo() {
+        if (mIsPrediction) return null;
         return mSuggestedWordInfoList.isEmpty() ? null : mSuggestedWordInfoList.get(0);
     }
 
     @Nullable
     @Override
     public String getAutoCorrectionWord() {
+        if (mIsPrediction) return null;
         return mSuggestedWordInfoList.isEmpty() ? null : mSuggestedWordInfoList.get(0).mWord;
     }
 
     @Nullable
     @Override
     public SuggestedWordInfo getAutoCommitCandidate() {
+        if (mIsPrediction) return null;
         return mSuggestedWordInfoList.isEmpty() ? null : mSuggestedWordInfoList.get(0);
     }
 }

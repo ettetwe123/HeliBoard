@@ -13,6 +13,7 @@ import android.widget.TextView;
 
 import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.SuggestedWords;
+import helium314.keyboard.latin.tableime.TableImeSuggestedWords;
 
 import java.util.ArrayList;
 
@@ -91,8 +92,10 @@ public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHe
             return null;
         }
         final String word = suggestedWords.getLabel(indexInSuggestedWords);
-        // Candidate 0 (left-most) is the primary match committed by space -> BOLD!
-        if (indexInSuggestedWords == 0) {
+        final boolean isPrediction = (suggestedWords instanceof TableImeSuggestedWords)
+                && ((TableImeSuggestedWords) suggestedWords).isPrediction();
+        // Candidate 0 (left-most) is the primary match committed by space -> BOLD (only when composing)!
+        if (indexInSuggestedWords == 0 && !isPrediction) {
             final Spannable spannedWord = new SpannableString(word);
             addStyleSpan(spannedWord, BOLD_SPAN);
             return spannedWord;
@@ -105,7 +108,9 @@ public class TableImeSuggestionStripLayoutHelper extends SuggestionStripLayoutHe
             final SuggestedWords suggestedWords,
             final int indexInSuggestedWords
     ) {
-        if (indexInSuggestedWords == 0) {
+        final boolean isPrediction = (suggestedWords instanceof TableImeSuggestedWords)
+                && ((TableImeSuggestedWords) suggestedWords).isPrediction();
+        if (indexInSuggestedWords == 0 && !isPrediction) {
             return mColorAutoCorrect;
         }
         return mColorSuggested;

@@ -189,4 +189,110 @@ class TableImeTest {
         val tableSuggestedWords = helium314.keyboard.latin.tableime.TableImeSuggestedWords(list, 1)
         assertTrue(helium314.keyboard.latin.tableime.TableImeHandler.shouldUpdateSuggestions(tableSuggestedWords, "cangjie"))
     }
+
+    @Test
+    fun testWordPredictor() {
+        val words = listOf(
+            "北京",
+            "北京大學",
+            "北極",
+            "北美",
+            "香港",
+            "香港人",
+            "香港島",
+            "香水",
+            "香蕉",
+            "食飯",
+            "食飯未",
+            "食物",
+            "食嘢"
+        ).sorted()
+
+        val predictor = helium314.keyboard.latin.tableime.TableImeWordPredictor(words)
+
+        // Predict after "香"
+        val resHeong = predictor.predict("香")
+        println("Predict 香: $resHeong")
+        assertTrue(resHeong.contains("港"))
+        assertTrue(resHeong.contains("水"))
+        assertTrue(resHeong.contains("蕉"))
+        // 1-char continuation "港" should come before 2-char continuation "港人"
+        val idxKong = resHeong.indexOf("港")
+        val idxKongYan = resHeong.indexOf("港人")
+        assertTrue(idxKong < idxKongYan)
+
+        // Predict after "香港"
+        val resHeongKong = predictor.predict("香港")
+        println("Predict 香港: $resHeongKong")
+        assertTrue(resHeongKong.contains("人"))
+        assertTrue(resHeongKong.contains("島"))
+
+        // Predict after "我想食" (context suffix fallback to "食")
+        val resSik = predictor.predict("我想食")
+        println("Predict 我想食: $resSik")
+        assertTrue(resSik.contains("飯"))
+        assertTrue(resSik.contains("物"))
+        assertTrue(resSik.contains("嘢"))
+        val idxFaan = resSik.indexOf("飯")
+        val idxFaanMei = resSik.indexOf("飯未")
+        assertTrue(idxFaan < idxFaanMei)
+    }
+
+    @Test
+    fun testWordPredictorRealAsset() {
+        val file = java.io.File("src/main/assets/tableime/jyut6ping3_words.tsv")
+        assertTrue(file.exists())
+        val words = file.readLines().mapNotNull { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) null
+            else {
+                val tabIdx = trimmed.indexOf('\t')
+                if (tabIdx != -1) trimmed.substring(0, tabIdx).trim() else trimmed
+            }
+        }
+        assertTrue(words.size > 100000)
+        val predictor = helium314.keyboard.latin.tableime.TableImeWordPredictor(words)
+
+        val resHeong = predictor.predict("香")
+        println("Real asset predict 香: ${resHeong.take(10)}")
+        assertTrue(resHeong.contains("港"))
+        assertTrue(resHeong.contains("水"))
+        assertTrue(resHeong.contains("蕉"))
+
+        val resHeongKong = predictor.predict("香港")
+        println("Real asset predict 香港: ${resHeongKong.take(10)}")
+        assertTrue(resHeongKong.contains("人"))
+        assertTrue(resHeongKong.contains("島"))
+
+        val resPak = predictor.predict("北")
+        println("Real asset predict 北: ${resPak.take(10)}")
+        assertTrue(resPak.contains("京"))
+        assertTrue(resPak.contains("方"))
+        assertTrue(resPak.contains("極"))
+
+        val resSik = predictor.predict("食")
+        println("Real asset predict 食: ${resSik.take(10)}")
+        assertTrue(resSik.contains("飯"))
+        assertTrue(resSik.contains("物"))
+        assertTrue(resSik.contains("嘢"))
+    }
+
+    @Test
+    fun testTableImeSuggestedWordsPrediction() {
+        val list = arrayListOf(
+            helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo(
+                "港", "", 1000, helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo.KIND_PREDICTION,
+                helium314.keyboard.latin.dictionary.Dictionary.DICTIONARY_USER_TYPED, 0, -1
+            )
+        )
+        val pred = helium314.keyboard.latin.tableime.TableImeSuggestedWords(list, 1, true)
+        assertTrue(pred.isPrediction)
+        assertEquals(helium314.keyboard.latin.InputStyle.PREDICTION, pred.mInputStyle)
+        // Ensure auto-commit candidate is null so space does not commit predictions!
+        kotlin.test.assertNull(pred.autoCommitCandidate)
+        kotlin.test.assertNull(pred.autoCorrectionWord)
+        kotlin.test.assertNull(pred.autoCorrectionWordInfo)
+
+        assertEquals("tableime/jyut6ping3_words.tsv", CangjieSpec.nextWordsAsset)
+    }
 }

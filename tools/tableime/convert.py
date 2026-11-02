@@ -35,14 +35,51 @@ def convert_dict(yaml_path, tsv_path):
     
     print(f"Converted {yaml_path} -> {tsv_path}: {len(entries)} entries")
 
+def convert_words_dict(yaml_path, tsv_path):
+    words_map = {}
+    with open(yaml_path, 'r', encoding='utf-8') as f:
+        in_header = True
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if in_header:
+                if line == '...':
+                    in_header = False
+                continue
+            if line.startswith('#'):
+                continue
+            parts = line.split('\t')
+            if len(parts) >= 1:
+                word = parts[0].strip()
+                pron = parts[1].strip() if len(parts) > 1 else ""
+                if word and word not in words_map:
+                    words_map[word] = pron
+    
+    sorted_words = sorted(words_map.keys())
+    with open(tsv_path, 'w', encoding='utf-8') as out:
+        for word in sorted_words:
+            pron = words_map[word]
+            if pron:
+                out.write(f"{word}\t{pron}\n")
+            else:
+                out.write(f"{word}\n")
+    print(f"Converted {yaml_path} -> {tsv_path}: {len(sorted_words)} unique words")
+
 def main():
-    base_yaml = "cangjie5.base.dict.yaml"
-    extended_yaml = "cangjie5.extended.dict.yaml"
-    out_dir = "app/src/main/assets/tableime"
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    base_yaml = os.path.join(repo_root, "cangjie5.base.dict.yaml")
+    extended_yaml = os.path.join(repo_root, "cangjie5.extended.dict.yaml")
+    words_yaml = os.path.join(repo_root, "jyut6ping3.words.dict.yaml")
+    out_dir = os.path.join(repo_root, "app/src/main/assets/tableime")
     os.makedirs(out_dir, exist_ok=True)
     
-    convert_dict(base_yaml, os.path.join(out_dir, "cangjie5_base.tsv"))
-    convert_dict(extended_yaml, os.path.join(out_dir, "cangjie5_extended.tsv"))
+    if os.path.exists(base_yaml):
+        convert_dict(base_yaml, os.path.join(out_dir, "cangjie5_base.tsv"))
+    if os.path.exists(extended_yaml):
+        convert_dict(extended_yaml, os.path.join(out_dir, "cangjie5_extended.tsv"))
+    if os.path.exists(words_yaml):
+        convert_words_dict(words_yaml, os.path.join(out_dir, "jyut6ping3_words.tsv"))
     
     readme_path = os.path.join(out_dir, "README.txt")
     with open(readme_path, "w", encoding="utf-8") as f:
@@ -51,6 +88,7 @@ def main():
         f.write("Original credit:\n")
         f.write("單字碼表《五倉世紀》來自 www.chinesecj.com\n")
         f.write("倉頡五代構詞碼碼表 由惜緣兄製作 佛振修訂\n")
+        f.write("粵拼詞庫來自 rime-cantonese (CanCLID/rime-cantonese-upstream)\n")
     print("Created README.txt attribution")
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
                           inputStyle: InputStyle, sequenceNumber: Int): SuggestedWords {
         val combiningSpec = wordComposer.combiningSpec
         if (TableImeRegistry.isTableIme(combiningSpec)) {
-            return getSuggestedWordsForTableIme(wordComposer, combiningSpec, sequenceNumber)
+            return getSuggestedWordsForTableIme(wordComposer, combiningSpec, sequenceNumber, ngramContext)
         }
         return if (wordComposer.isBatchMode) {
             getSuggestedWordsForBatchInput(wordComposer, ngramContext, keyboard, settingsValuesForSuggestion,
@@ -78,13 +78,43 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
     private fun getSuggestedWordsForTableIme(
         wordComposer: WordComposer,
         combiningSpec: String,
-        sequenceNumber: Int
+        sequenceNumber: Int,
+        ngramContext: NgramContext
     ): SuggestedWords {
         val rawCode = wordComposer.rawComposingCode
-        if (rawCode.isEmpty()) {
-            return TableImeSuggestedWords.empty(sequenceNumber)
-        }
         val context = Settings.getCurrentContext() ?: return TableImeSuggestedWords.empty(sequenceNumber)
+
+        if (rawCode.isEmpty()) {
+            if (!Settings.getValues().mBigramPredictionEnabled) {
+                return TableImeSuggestedWords.empty(sequenceNumber)
+            }
+            val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)
+                ?: return TableImeSuggestedWords.empty(sequenceNumber)
+            val prevWord = ngramContext.getNthPrevWord(1)?.toString() ?: ""
+            if (prevWord.isEmpty()) {
+                return TableImeSuggestedWords.empty(sequenceNumber)
+            }
+            val candidates = predictor.predict(prevWord)
+            if (candidates.isEmpty()) {
+                return TableImeSuggestedWords.empty(sequenceNumber)
+            }
+            val suggestionsList = ArrayList<SuggestedWordInfo>(candidates.size)
+            for ((index, word) in candidates.withIndex()) {
+                suggestionsList.add(
+                    SuggestedWordInfo(
+                        word,
+                        "",
+                        SuggestedWordInfo.MAX_SCORE - index,
+                        SuggestedWordInfo.KIND_PREDICTION,
+                        Dictionary.DICTIONARY_USER_TYPED,
+                        index,
+                        SuggestedWordInfo.NOT_A_CONFIDENCE
+                    )
+                )
+            }
+            return TableImeSuggestedWords(suggestionsList, sequenceNumber, true)
+        }
+
         val table = TableImeRegistry.getTable(context, combiningSpec)
             ?: return TableImeSuggestedWords.empty(sequenceNumber)
 
@@ -111,7 +141,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             )
         }
 
-        return TableImeSuggestedWords(suggestionsList, sequenceNumber)
+        return TableImeSuggestedWords(suggestionsList, sequenceNumber, false)
     }
 
     // Retrieves suggestions for non-batch input (typing, recorrection, predictions...)

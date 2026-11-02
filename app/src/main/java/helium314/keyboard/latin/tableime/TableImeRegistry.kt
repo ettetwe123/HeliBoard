@@ -15,6 +15,7 @@ object TableImeRegistry {
     }
 
     private val tables = ConcurrentHashMap<String, TableImeTable>()
+    private val wordPredictors = ConcurrentHashMap<String, TableImeWordPredictor>()
 
     @Volatile
     var activeCombiner: TableImeCombiner? = null
@@ -43,6 +44,20 @@ object TableImeRegistry {
         }
     }
 
+    fun getWordPredictor(context: Context, combiningRules: String): TableImeWordPredictor? {
+        val spec = getSpec(combiningRules) ?: return null
+        val asset = spec.nextWordsAsset ?: return null
+        val existing = wordPredictors[spec.id]
+        if (existing != null) return existing
+
+        synchronized(wordPredictors) {
+            wordPredictors[spec.id]?.let { return it }
+            val predictor = TableImeWordPredictor.loadFromAsset(context, asset)
+            wordPredictors[spec.id] = predictor
+            return predictor
+        }
+    }
+
     fun preloadAsync(context: Context, combiningRules: String, loadExtended: Boolean = false) {
         val spec = getSpec(combiningRules) ?: return
         executor.execute {
@@ -52,6 +67,10 @@ object TableImeRegistry {
                     val ext = TableImeTable.loadFromAsset(context, spec.extendedTableAsset!!)
                     table.extendedEntries = ext
                     Log.i(TAG, "Loaded extended table for ${spec.id}: ${ext.size} entries")
+                }
+                if (spec.nextWordsAsset != null && !wordPredictors.containsKey(spec.id)) {
+                    getWordPredictor(context, combiningRules)
+                    Log.i(TAG, "Loaded word predictor for ${spec.id}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed preloading table for $combiningRules", e)

@@ -907,7 +907,11 @@ public final class InputLogic {
         commitChosenWord(Settings.getValues(), text, commitType, LastComposedWord.NOT_A_SEPARATOR);
         mSpaceState = SpaceState.NONE;
         mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
-        handler.cancelUpdateSuggestionStrip();
+        if (Settings.getValues().mBigramPredictionEnabled) {
+            handler.postUpdateSuggestionStrip(InputStyle.NONE);
+        } else {
+            handler.cancelUpdateSuggestionStrip();
+        }
     }
 
     /**
@@ -2064,6 +2068,10 @@ public final class InputLogic {
             // If we are typing in a language with spaces we can just look up the previous
             // word information from textview.
             return mConnection.getNgramContextFromNthPreviousWord(spacingAndPunctuations, nthPreviousWord);
+        }
+        final CharSequence textBeforeCursor = mConnection.getTextBeforeCursor(20, 0);
+        if (textBeforeCursor != null && textBeforeCursor.length() > 0) {
+            return new NgramContext(new NgramContext.WordInfo(textBeforeCursor.toString()));
         }
         if (LastComposedWord.NOT_A_COMPOSED_WORD == mLastComposedWord) {
             return NgramContext.BEGINNING_OF_SENTENCE;

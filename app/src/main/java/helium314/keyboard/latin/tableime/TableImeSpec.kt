@@ -7,6 +7,7 @@ interface TableImeSpec {
     val maxCodeLength: Int
     val baseTableAsset: String
     val extendedTableAsset: String?
+    val nextWordsAsset: String? get() = null
 
     fun codeToRadical(c: Char): String
     fun getRadicalString(code: String): String {
