@@ -295,4 +295,38 @@ class TableImeTest {
 
         assertEquals("tableime/jyut6ping3_words.tsv", CangjieSpec.nextWordsAsset)
     }
+
+    @Test
+    fun testFrequentWordsOptionAOrdering() {
+        val baseEntries = listOf(
+            TableImeTable.Entry("a", "日"),
+            TableImeTable.Entry("a", "曰"),
+            TableImeTable.Entry("aa", "昌"),
+            TableImeTable.Entry("aaa", "晶"),
+            TableImeTable.Entry("ab", "明")
+        )
+        val table = TableImeTable(baseEntries)
+
+        // Without frequent words: default order
+        val normal = table.lookup("a", frequentWords = null)
+        assertEquals(listOf("日", "曰", "昌", "晶", "明"), normal)
+
+        // With "曰" in frequent words:
+        // "曰" should move ahead of "日" in Exact matches.
+        // Exact matches ("曰", "日") MUST stay ahead of Prefix matches ("昌", "晶", "明")!
+        val withYu = table.lookup("a", frequentWords = setOf("曰"))
+        assertEquals(listOf("曰", "日", "昌", "晶", "明"), withYu)
+
+        // With "曰" and "明" in frequent words:
+        // "曰" is ahead of "日" (in exact matches)
+        // "明" is ahead of "昌" and "晶" (in prefix matches)
+        // Exact matches ("曰", "日") STILL stay ahead of Prefix match "明"!
+        val withYuAndMing = table.lookup("a", frequentWords = setOf("曰", "明"))
+        assertEquals(listOf("曰", "日", "明", "昌", "晶"), withYuAndMing)
+
+        // Only "明" (a prefix match) in frequent words:
+        // "明" floats ahead of "昌" and "晶", but NEVER jumps ahead of exact matches ("日", "曰")!
+        val withMingOnly = table.lookup("a", frequentWords = setOf("明"))
+        assertEquals(listOf("日", "曰", "明", "昌", "晶"), withMingOnly)
+    }
 }

@@ -21,32 +21,57 @@ class TableImeTable(
     fun lookup(
         code: String,
         includeExtended: Boolean = false,
-        maxCandidates: Int = 500
+        maxCandidates: Int = 500,
+        frequentWords: Set<String>? = null
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()
-        val candidates = LinkedHashSet<String>()
+        val exactMatches = LinkedHashSet<String>()
 
         // 1. Exact matches from base
-        collectExactMatches(baseEntries, query, candidates, maxCandidates)
+        collectExactMatches(baseEntries, query, exactMatches, maxCandidates)
 
         // 2. Exact matches from extended (if enabled and loaded)
         val ext = if (includeExtended) extendedEntries else null
-        if (ext != null && candidates.size < maxCandidates) {
-            collectExactMatches(ext, query, candidates, maxCandidates)
+        if (ext != null && exactMatches.size < maxCandidates) {
+            collectExactMatches(ext, query, exactMatches, maxCandidates)
         }
 
+        val prefixMatches = LinkedHashSet<String>()
+
         // 3. Prefix matches from base
-        if (candidates.size < maxCandidates) {
-            collectPrefixMatches(baseEntries, query, candidates, maxCandidates)
+        if (exactMatches.size + prefixMatches.size < maxCandidates) {
+            collectPrefixMatches(baseEntries, query, prefixMatches, maxCandidates - exactMatches.size)
         }
 
         // 4. Prefix matches from extended
-        if (ext != null && candidates.size < maxCandidates) {
-            collectPrefixMatches(ext, query, candidates, maxCandidates)
+        if (ext != null && exactMatches.size + prefixMatches.size < maxCandidates) {
+            collectPrefixMatches(ext, query, prefixMatches, maxCandidates - exactMatches.size)
         }
 
-        return candidates.toList()
+        if (frequentWords.isNullOrEmpty()) {
+            val candidates = ArrayList<String>(exactMatches.size + prefixMatches.size)
+            candidates.addAll(exactMatches)
+            candidates.addAll(prefixMatches)
+            return candidates
+        }
+
+        // Option A: Exact matches (frequent first, then non-frequent),
+        // followed by Prefix matches (frequent first, then non-frequent).
+        val result = ArrayList<String>(exactMatches.size + prefixMatches.size)
+        for (word in exactMatches) {
+            if (frequentWords.contains(word)) result.add(word)
+        }
+        for (word in exactMatches) {
+            if (!frequentWords.contains(word)) result.add(word)
+        }
+        for (word in prefixMatches) {
+            if (frequentWords.contains(word)) result.add(word)
+        }
+        for (word in prefixMatches) {
+            if (!frequentWords.contains(word)) result.add(word)
+        }
+        return result
     }
 
     private fun collectExactMatches(

@@ -98,6 +98,9 @@ public final class Constants {
             /** Indicates whether extended table (rare characters) should be enabled for Table IME */
             public static final String TABLE_IME_EXTENDED = "TableImeExtended";
 
+            /** Indicates whether frequent characters should be prioritized for Table IME */
+            public static final String TABLE_IME_FREQ_WORDS = "TableImeFreqWords";
+
             private ExtraValue() {
                 // This utility class is not publicly instantiable.
             }

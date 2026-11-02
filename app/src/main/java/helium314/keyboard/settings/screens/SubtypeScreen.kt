@@ -232,7 +232,7 @@ fun SubtypeScreen(
                 }
                 val combiningRules = currentSubtype.getExtraValueOf(ExtraValue.COMBINING_RULES)
                 if (TableImeRegistry.isTableIme(combiningRules)) {
-                    val checked = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_EXTENDED)?.toBoolean() ?: false
+                    val checkedExtended = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_EXTENDED)?.toBoolean() ?: false
                     WithSmallTitle(stringResource(R.string.table_ime_extended_title)) {
                         ActionRow {
                             Text(
@@ -242,13 +242,34 @@ fun SubtypeScreen(
                                     .padding(start = 10.dp)
                             )
                             Switch(
-                                checked = checked,
+                                checked = checkedExtended,
                                 onCheckedChange = {
                                     if (it) {
                                         setCurrentSubtype(currentSubtype.with(ExtraValue.TABLE_IME_EXTENDED, "true"))
                                         TableImeRegistry.ensureExtendedLoaded(ctx, combiningRules!!)
                                     } else {
                                         setCurrentSubtype(currentSubtype.without(ExtraValue.TABLE_IME_EXTENDED))
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    val checkedFreq = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_FREQ_WORDS)?.toBoolean() ?: false
+                    WithSmallTitle(stringResource(R.string.table_ime_freq_words_title)) {
+                        ActionRow {
+                            Text(
+                                stringResource(R.string.table_ime_freq_words_summary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp)
+                            )
+                            Switch(
+                                checked = checkedFreq,
+                                onCheckedChange = {
+                                    if (it) {
+                                        setCurrentSubtype(currentSubtype.with(ExtraValue.TABLE_IME_FREQ_WORDS, "true"))
+                                    } else {
+                                        setCurrentSubtype(currentSubtype.without(ExtraValue.TABLE_IME_FREQ_WORDS))
                                     }
                                 }
                             )

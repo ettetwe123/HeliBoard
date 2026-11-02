@@ -28,6 +28,7 @@ import helium314.keyboard.latin.utils.SuggestionResults
 import helium314.keyboard.latin.utils.WordData
 import helium314.keyboard.latin.utils.useBackgroundGathering
 import helium314.keyboard.latin.tableime.TableImeRegistry
+import helium314.keyboard.latin.tableime.TableImeUserHistory
 import helium314.keyboard.latin.tableime.TableImeSuggestedWords
 import java.util.Locale
 import kotlin.math.max
@@ -120,8 +121,10 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
         val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
+        val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
+        val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWords(context, combiningSpec) else null
 
-        val candidates = table.lookup(rawCode, includeExtended = includeExtended)
+        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWords = frequentWords)
         if (candidates.isEmpty()) {
             return TableImeSuggestedWords.empty(sequenceNumber)
         }

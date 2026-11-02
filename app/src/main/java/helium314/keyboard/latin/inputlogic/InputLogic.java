@@ -45,6 +45,7 @@ import helium314.keyboard.latin.LatinIME;
 import helium314.keyboard.latin.NgramContext;
 import helium314.keyboard.latin.RichInputConnection;
 import helium314.keyboard.latin.tableime.TableImeHandler;
+import helium314.keyboard.latin.tableime.TableImeSuggestedWords;
 import helium314.keyboard.latin.SingleDictionaryFacilitator;
 import helium314.keyboard.latin.Suggest;
 import helium314.keyboard.latin.Suggest.OnGetSuggestedWordsCallback;
@@ -346,6 +347,10 @@ public final class InputLogic {
         mConnection.endBatchEdit();
         // Don't allow cancellation of manual pick
         mLastComposedWord.deactivate();
+
+        if (suggestedWords instanceof TableImeSuggestedWords && !((TableImeSuggestedWords) suggestedWords).isPrediction()) {
+            TableImeHandler.onWordCommitted(mWordComposer.getCombiningSpec(), suggestion);
+        }
 
         if (suggestionInfo.isEmoji()) {
             RecentEmojis.add(suggestion);

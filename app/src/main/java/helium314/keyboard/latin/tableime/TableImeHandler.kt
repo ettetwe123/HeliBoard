@@ -40,6 +40,7 @@ object TableImeHandler {
         }
         val result = resolveCommit(suggestedWords, wordComposer, isEnter = false)
         if (result != null) {
+            onWordCommitted(wordComposer.combiningSpec, result.text)
             inputLogic.commitTableImeWord(result.text, result.commitType, handler)
         }
         return true
@@ -57,9 +58,19 @@ object TableImeHandler {
         }
         val result = resolveCommit(suggestedWords, wordComposer, isEnter = true)
         if (result != null) {
+            onWordCommitted(wordComposer.combiningSpec, result.text)
             inputLogic.commitTableImeWord(result.text, result.commitType, handler)
         }
         return true
+    }
+
+    @JvmStatic
+    fun onWordCommitted(combiningSpec: String?, word: String) {
+        if (!isTableIme(combiningSpec) || word.isEmpty()) return
+        val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
+        if (!currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)) return
+        val context = Settings.getCurrentContext() ?: return
+        TableImeUserHistory.recordWord(context, combiningSpec!!, word)
     }
 
     /**
@@ -89,7 +100,9 @@ object TableImeHandler {
                     if (table != null) {
                         val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
                         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
-                        val candidates = table.lookup(rawCode, includeExtended = includeExtended)
+                        val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
+                        val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWords(context, combiningSpec) else null
+                        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWords = frequentWords)
                         if (candidates.isNotEmpty()) {
                             firstWord = candidates[0]
                         }

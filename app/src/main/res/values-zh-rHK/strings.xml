@@ -122,4 +122,6 @@
     <string name="subtype_generic_cangjie">%s (倉頡)</string>
     <string name="table_ime_extended_title">包含罕用字（擴展字表）</string>
     <string name="table_ime_extended_summary">搜尋擴展字碼表（更多候選字）</string>
+    <string name="table_ime_freq_words_title">常用字置前</string>
+    <string name="table_ime_freq_words_summary">打字時將揀選過的字排在候選字前列</string>
 </resources>
