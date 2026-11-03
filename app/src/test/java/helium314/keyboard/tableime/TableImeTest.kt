@@ -12,6 +12,7 @@ import helium314.keyboard.latin.tableime.TableImeUserHistory
 import helium314.keyboard.latin.tableime.TableImeWordPredictor
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import kotlin.test.Test
@@ -20,6 +21,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class TableImeTest {
 
     @Test
@@ -136,7 +138,18 @@ class TableImeTest {
     fun testParseCangjieLayout() {
         val json = java.io.File("src/main/assets/layouts/main/cangjie.json").readText()
         val parsed = helium314.keyboard.keyboard.internal.keyboard_parser.LayoutParser.parseJsonString(json, false)
-        println("First key: ${parsed[0][0]}")
+        assertEquals(3, parsed.size)
+        assertEquals(10, parsed[0].size)
+        assertEquals(9, parsed[1].size)
+        assertEquals(8, parsed[2].size)
+        val row3 = parsed[2]
+        val placeholder = row3[0] as helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
+        assertEquals(helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyType.PLACEHOLDER, placeholder.type)
+        assertEquals(0.15f, placeholder.width)
+        val firstCharKey = row3[1] as helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
+        assertEquals("重", firstCharKey.label)
+        val lastCharKey = row3[7] as helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
+        assertEquals("一", lastCharKey.label)
     }
 
     @Test
@@ -157,6 +170,44 @@ class TableImeTest {
         println("Lookup kokr: $resKokr")
         assertTrue(resKokr.contains("痴"))
         assertEquals("痴", resKokr[0])
+    }
+
+    @Test
+    fun testFuzzyLookup() {
+        val baseFile = java.io.File("src/main/assets/tableime/cangjie_base.bin")
+        val wordsFile = java.io.File("src/main/assets/tableime/cangjie_words.bin")
+        assertTrue(baseFile.exists())
+        assertTrue(wordsFile.exists())
+
+        val table = TableImeTable(TableImeTable.BinarySource(java.nio.ByteBuffer.wrap(baseFile.readBytes())))
+        val predictor = TableImeWordPredictor(TableImeWordPredictor.BinarySource(java.nio.ByteBuffer.wrap(wordsFile.readBytes())))
+        val isCommon: (String) -> Boolean = { predictor.isCommon(it) }
+
+        // 1. Correct code vnd -> exact match "好", no fuzzy pollution
+        val resVnd = table.lookup("vnd", enableFuzzy = true, isCommonWord = isCommon)
+        assertEquals("好", resVnd[0])
+        assertFalse(resVnd.contains("釨"))
+
+        // 2. Neighbor typo cnd (金弓木 instead of 女弓木) -> exact match "釨" at pos 0, and fuzzy "好" right behind it
+        val resCnd = table.lookup("cnd", enableFuzzy = true, isCommonWord = isCommon)
+        assertEquals("釨", resCnd[0])
+        assertTrue(resCnd.contains("好"))
+        assertTrue(resCnd.indexOf("好") in 1..4)
+
+        // 3. Extra key insertion typo gnrmi (壽 with extra 口 in the middle) -> direct empty, fuzzy "壽" at pos 0
+        val resGnrmi = table.lookup("gnrmi", enableFuzzy = true, isCommonWord = isCommon)
+        assertTrue(resGnrmi.isNotEmpty())
+        assertEquals("壽", resGnrmi[0])
+
+        // 4. Extra key insertion typo grnmi (壽 with extra 口) -> direct empty, fuzzy "壽" at pos 0
+        val resGrnmi = table.lookup("grnmi", enableFuzzy = true, isCommonWord = isCommon)
+        assertTrue(resGrnmi.isNotEmpty())
+        assertEquals("壽", resGrnmi[0])
+
+        // 5. Neighbor typo shdvi (鬆 is shdci, c and v are neighbors) -> direct empty, fuzzy "鬆" at pos 0
+        val resShdvi = table.lookup("shdvi", enableFuzzy = true, isCommonWord = isCommon)
+        assertTrue(resShdvi.isNotEmpty())
+        assertEquals("鬆", resShdvi[0])
     }
 
     @Test

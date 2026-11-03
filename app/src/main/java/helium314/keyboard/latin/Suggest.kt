@@ -143,8 +143,19 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             ?: return TableImeSuggestedWords.empty(sequenceNumber)
 
         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
+        val fuzzyEnabled = currentSubtype.getExtraValueOf(Constants.Subtype.ExtraValue.TABLE_IME_FUZZY)?.toBoolean() ?: true
+        val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)
+        val isCommon: (String) -> Boolean = { word ->
+            (frequentWordCounts?.containsKey(word) == true) || (predictor?.isCommon(word) == true)
+        }
 
-        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWordCounts = frequentWordCounts)
+        val candidates = table.lookup(
+            rawCode,
+            includeExtended = includeExtended,
+            frequentWordCounts = frequentWordCounts,
+            enableFuzzy = fuzzyEnabled,
+            isCommonWord = isCommon
+        )
         if (candidates.isEmpty()) {
             return TableImeSuggestedWords.empty(sequenceNumber)
         }

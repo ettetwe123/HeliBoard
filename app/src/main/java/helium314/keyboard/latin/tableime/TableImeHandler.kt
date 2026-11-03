@@ -131,7 +131,18 @@ object TableImeHandler {
                         val includeExtended = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_EXTENDED)
                         val adjustFreq = currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)
                         val frequentWords = if (adjustFreq) TableImeUserHistory.getFrequentWordCounts(context, combiningSpec) else null
-                        val candidates = table.lookup(rawCode, includeExtended = includeExtended, frequentWordCounts = frequentWords)
+                        val fuzzyEnabled = currentSubtype.getExtraValueOf(Constants.Subtype.ExtraValue.TABLE_IME_FUZZY)?.toBoolean() ?: true
+                        val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)
+                        val isCommon: (String) -> Boolean = { word ->
+                            (frequentWords?.containsKey(word) == true) || (predictor?.isCommon(word) == true)
+                        }
+                        val candidates = table.lookup(
+                            rawCode,
+                            includeExtended = includeExtended,
+                            frequentWordCounts = frequentWords,
+                            enableFuzzy = fuzzyEnabled,
+                            isCommonWord = isCommon
+                        )
                         if (candidates.isNotEmpty()) {
                             firstWord = candidates[0]
                         }

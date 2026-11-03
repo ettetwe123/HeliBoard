@@ -64,7 +64,9 @@ class TableImeTable(
         code: String,
         includeExtended: Boolean = false,
         maxCandidates: Int = 500,
-        frequentWordCounts: Map<String, Int>? = null
+        frequentWordCounts: Map<String, Int>? = null,
+        enableFuzzy: Boolean = true,
+        isCommonWord: ((String) -> Boolean)? = null
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()
@@ -94,18 +96,61 @@ class TableImeTable(
             }
         }
 
+        val directExactTotal = baseExact.size + extExact.size
+        val hasCommonDirect = isCommonWord != null && (baseExact.any(isCommonWord) || extExact.any(isCommonWord))
+
+        val fuzzyMatches = LinkedHashSet<String>()
+        if (enableFuzzy && query.length >= 3 && (directExactTotal == 0 || !hasCommonDirect)) {
+            val fuzzyRaw = LinkedHashSet<String>()
+            collectFuzzyExactMatches(query, fuzzyRaw, maxCandidates, includeExtended)
+            for (w in fuzzyRaw) {
+                if (!baseExact.contains(w) && !basePrefix.contains(w) && !extExact.contains(w) && !extPrefix.contains(w)) {
+                    fuzzyMatches.add(w)
+                }
+            }
+        }
+
         if (frequentWordCounts.isNullOrEmpty()) {
-            val candidates = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size)
+            val candidates = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size + fuzzyMatches.size)
+            if (directExactTotal == 0 && basePrefix.isEmpty() && extPrefix.isEmpty()) {
+                if (isCommonWord != null) {
+                    val commonFuzzy = ArrayList<String>()
+                    val remainingFuzzy = ArrayList<String>()
+                    for (w in fuzzyMatches) {
+                        if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
+                    }
+                    candidates.addAll(commonFuzzy)
+                    candidates.addAll(remainingFuzzy)
+                } else {
+                    candidates.addAll(fuzzyMatches)
+                }
+                return candidates
+            }
+
             candidates.addAll(baseExact)
-            candidates.addAll(basePrefix)
-            candidates.addAll(extExact)
-            candidates.addAll(extPrefix)
+            if (isCommonWord != null && fuzzyMatches.isNotEmpty()) {
+                val commonFuzzy = ArrayList<String>()
+                val remainingFuzzy = ArrayList<String>()
+                for (w in fuzzyMatches) {
+                    if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
+                }
+                candidates.addAll(commonFuzzy)
+                candidates.addAll(basePrefix)
+                candidates.addAll(extExact)
+                candidates.addAll(extPrefix)
+                candidates.addAll(remainingFuzzy)
+            } else {
+                candidates.addAll(basePrefix)
+                candidates.addAll(extExact)
+                candidates.addAll(extPrefix)
+                candidates.addAll(fuzzyMatches)
+            }
             return candidates
         }
 
         // Option A: Base exact -> Base prefix -> Ext exact -> Ext prefix
         // (within each section, frequent words sorted by count DESC, then non-frequent in table order).
-        val result = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size)
+        val result = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size + fuzzyMatches.size)
 
         fun appendPartition(matches: Iterable<String>) {
             val frequentList = ArrayList<String>()
@@ -126,11 +171,90 @@ class TableImeTable(
             result.addAll(nonFrequentList)
         }
 
+        if (directExactTotal == 0 && basePrefix.isEmpty() && extPrefix.isEmpty()) {
+            if (isCommonWord != null) {
+                val commonFuzzy = ArrayList<String>()
+                val remainingFuzzy = ArrayList<String>()
+                for (w in fuzzyMatches) {
+                    if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
+                }
+                appendPartition(commonFuzzy)
+                appendPartition(remainingFuzzy)
+            } else {
+                appendPartition(fuzzyMatches)
+            }
+            return result
+        }
+
         appendPartition(baseExact)
-        appendPartition(basePrefix)
-        appendPartition(extExact)
-        appendPartition(extPrefix)
+        if (isCommonWord != null && fuzzyMatches.isNotEmpty()) {
+            val commonFuzzy = ArrayList<String>()
+            val remainingFuzzy = ArrayList<String>()
+            for (w in fuzzyMatches) {
+                if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
+            }
+            appendPartition(commonFuzzy)
+            appendPartition(basePrefix)
+            appendPartition(extExact)
+            appendPartition(extPrefix)
+            appendPartition(remainingFuzzy)
+        } else {
+            appendPartition(basePrefix)
+            appendPartition(extExact)
+            appendPartition(extPrefix)
+            appendPartition(fuzzyMatches)
+        }
         return result
+    }
+
+    fun collectFuzzyExactMatches(
+        query: String,
+        out: MutableSet<String>,
+        max: Int,
+        includeExtended: Boolean = false
+    ) {
+        if (query.length < 3) return
+        val seenCodes = HashSet<String>()
+        seenCodes.add(query)
+
+        val ext = if (includeExtended) extendedSource else null
+
+        fun tryCode(variant: String) {
+            if (out.size >= max || !seenCodes.add(variant)) return
+            baseSource.collectExactMatches(variant, out, max)
+            if (ext != null && out.size < max) {
+                ext.collectExactMatches(variant, out, max)
+            }
+        }
+
+        // 1. First-key neighbor substitution (highest priority for neighbor typos like 'cnd' -> 'vnd' -> 好)
+        val firstChar = query[0]
+        val firstNeighbors = QWERTY_NEIGHBORS[firstChar]
+        if (firstNeighbors != null) {
+            val tail = query.substring(1)
+            for (nb in firstNeighbors) {
+                tryCode(nb + tail)
+            }
+        }
+
+        // 2. Extra key deletion (drop 1 char, for typos like 'gnrmi' -> drop 'r' -> 'gnmi' -> 壽)
+        for (i in 0 until query.length) {
+            val sub = query.removeRange(i, i + 1)
+            if (sub.length >= 2) {
+                tryCode(sub)
+            }
+        }
+
+        // 3. Other positions neighbor substitution
+        for (i in 1 until query.length) {
+            val ch = query[i]
+            val neighbors = QWERTY_NEIGHBORS[ch] ?: continue
+            val prefix = query.substring(0, i)
+            val suffix = query.substring(i + 1)
+            for (nb in neighbors) {
+                tryCode(prefix + nb + suffix)
+            }
+        }
     }
 
     class ListSource(val entries: List<Entry>) : Source {
@@ -289,6 +413,37 @@ class TableImeTable(
     companion object {
         private const val TAG = "TableImeTable"
         private const val MAGIC_CJTB = 0x42544A43 // "CJTB" in little endian
+
+        val QWERTY_NEIGHBORS: Map<Char, List<Char>> = mapOf(
+            'q' to listOf('w', 'a', 's'),
+            'w' to listOf('q', 'e', 's', 'a', 'd'),
+            'e' to listOf('w', 'r', 'd', 's', 'f'),
+            'r' to listOf('e', 't', 'f', 'd', 'g'),
+            't' to listOf('r', 'y', 'g', 'f', 'h'),
+            'y' to listOf('t', 'u', 'h', 'g', 'j'),
+            'u' to listOf('y', 'i', 'j', 'h', 'k'),
+            'i' to listOf('u', 'o', 'k', 'j', 'l'),
+            'o' to listOf('i', 'p', 'l', 'k'),
+            'p' to listOf('o', 'l'),
+
+            'a' to listOf('q', 'w', 's', 'z'),
+            's' to listOf('a', 'd', 'w', 'e', 'z', 'x'),
+            'd' to listOf('s', 'f', 'e', 'r', 'x', 'c'),
+            'f' to listOf('d', 'g', 'r', 't', 'c', 'v'),
+            'g' to listOf('f', 'h', 't', 'y', 'v', 'b'),
+            'h' to listOf('g', 'j', 'y', 'u', 'b', 'n'),
+            'j' to listOf('h', 'k', 'u', 'i', 'n', 'm'),
+            'k' to listOf('j', 'l', 'i', 'o', 'm'),
+            'l' to listOf('k', 'o', 'p'),
+
+            'z' to listOf('a', 's', 'x'),
+            'x' to listOf('z', 'c', 's', 'd'),
+            'c' to listOf('x', 'v', 'd', 'f'),
+            'v' to listOf('c', 'b', 'f', 'g'),
+            'b' to listOf('v', 'n', 'g', 'h'),
+            'n' to listOf('b', 'm', 'h', 'j'),
+            'm' to listOf('n', 'j', 'k')
+        )
 
         fun loadSourceFromAsset(context: Context, assetPath: String): Source? {
             try {

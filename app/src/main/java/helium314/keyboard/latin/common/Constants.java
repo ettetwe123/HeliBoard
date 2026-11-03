@@ -107,6 +107,9 @@ public final class Constants {
             /** Indicates whether learned next-word associations should be enabled for Table IME */
             public static final String TABLE_IME_LEARN_PREDICTIONS = "TableImeLearnPredictions";
 
+            /** Indicates whether fuzzy / typo tolerance should be enabled for Table IME */
+            public static final String TABLE_IME_FUZZY = "TableImeFuzzy";
+
             private ExtraValue() {
                 // This utility class is not publicly instantiable.
             }

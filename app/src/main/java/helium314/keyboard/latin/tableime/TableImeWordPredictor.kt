@@ -18,6 +18,7 @@ class TableImeWordPredictor(
             maxCandidates: Int = 500,
             frequentWordCounts: Map<String, Int>? = null
         ): List<String>
+        fun hasWordsStartingWith(prefix: String): Boolean
         val size: Int
     }
 
@@ -26,6 +27,10 @@ class TableImeWordPredictor(
 
     val words: List<String>
         get() = (source as? ListSource)?.words ?: emptyList()
+
+    fun isCommon(text: String): Boolean {
+        return source.hasWordsStartingWith(text)
+    }
 
     /**
      * Given text before the cursor, predicts the next continuation words/characters.
@@ -58,6 +63,12 @@ class TableImeWordPredictor(
 
     class ListSource(val words: List<String>) : Source {
         override val size: Int get() = words.size
+
+        override fun hasWordsStartingWith(prefix: String): Boolean {
+            if (prefix.isEmpty() || words.isEmpty()) return false
+            val lo = lowerBound(words, prefix)
+            return lo < words.size && words[lo].startsWith(prefix)
+        }
 
         override fun lookupContinuations(
             prefix: String,
@@ -142,6 +153,13 @@ class TableImeWordPredictor(
         }
 
         override val size: Int get() = wordCount
+
+        override fun hasWordsStartingWith(prefix: String): Boolean {
+            if (prefix.isEmpty() || wordCount == 0) return false
+            val prefixBytes = prefix.toByteArray(Charsets.UTF_8)
+            val lo = lowerBound(prefixBytes)
+            return lo < wordCount && wordStartsWith(lo, prefixBytes)
+        }
 
         override fun lookupContinuations(
             prefix: String,
