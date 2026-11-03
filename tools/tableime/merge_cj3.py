@@ -3,8 +3,8 @@
 Merge Cangjie 3 dictionaries (cj3-special.txt & cj3.txt) into HeliBoard Cangjie tables.
 - Deduplicates strictly: no duplicate (code, character) pairs.
 - Preserves original Cangjie 5 ordering for existing codes.
-- Common / BMP characters go to cangjie5_base.tsv (e.g. ysyq -> 遲).
-- Supplementary / rare characters go to cangjie5_extended.tsv.
+- Common / BMP characters go to cangjie_base.tsv (e.g. ysyq -> 遲).
+- Supplementary / rare characters go to cangjie_extended.tsv.
 """
 
 import os
@@ -15,8 +15,8 @@ def merge():
     project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
     assets_dir = os.path.join(project_root, 'app', 'src', 'main', 'assets', 'tableime')
 
-    base_tsv = os.path.join(assets_dir, 'cangjie5_base.tsv')
-    ext_tsv = os.path.join(assets_dir, 'cangjie5_extended.tsv')
+    base_tsv = os.path.join(assets_dir, 'cangjie_base.tsv')
+    ext_tsv = os.path.join(assets_dir, 'cangjie_extended.tsv')
 
     cj3_special = os.path.join(base_dir, 'cj3-special.txt')
     cj3_main = os.path.join(base_dir, 'cj3.txt')

@@ -8,6 +8,7 @@ import helium314.keyboard.latin.tableime.CangjieSpec
 import helium314.keyboard.latin.tableime.TableImeCombiner
 import helium314.keyboard.latin.tableime.TableImeRegistry
 import helium314.keyboard.latin.tableime.TableImeTable
+import helium314.keyboard.latin.tableime.TableImeWordPredictor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -125,7 +126,7 @@ class TableImeTest {
 
     @Test
     fun testLookupRealAsset() {
-        val file = java.io.File("src/main/assets/tableime/cangjie5_base.tsv")
+        val file = java.io.File("src/main/assets/tableime/cangjie_base.tsv")
         val entries = file.readLines().filter { it.isNotBlank() }.mapNotNull { line ->
             val tab = line.indexOf('\t')
             if (tab != -1) TableImeTable.Entry(line.substring(0, tab).trim().lowercase(), line.substring(tab + 1).trim()) else null
@@ -240,7 +241,7 @@ class TableImeTest {
 
     @Test
     fun testWordPredictorRealAsset() {
-        val file = java.io.File("src/main/assets/tableime/cangjie5_words.tsv")
+        val file = java.io.File("src/main/assets/tableime/cangjie_words.tsv")
         assertTrue(file.exists())
         val words = file.readLines().mapNotNull { line ->
             val trimmed = line.trim()
@@ -293,7 +294,7 @@ class TableImeTest {
         kotlin.test.assertNull(pred.autoCorrectionWord)
         kotlin.test.assertNull(pred.autoCorrectionWordInfo)
 
-        assertEquals("tableime/cangjie5_words.bin", CangjieSpec.nextWordsAsset)
+        assertEquals("tableime/cangjie_words.bin", CangjieSpec.nextWordsAsset)
     }
 
     @Test

@@ -5,9 +5,9 @@ object CangjieSpec : TableImeSpec {
     override val id: String = "cangjie"
     override val combiningRules: String = "cangjie"
     override val maxCodeLength: Int = 5
-    override val baseTableAsset: String = "tableime/cangjie5_base.bin"
-    override val extendedTableAsset: String = "tableime/cangjie5_extended.bin"
-    override val nextWordsAsset: String = "tableime/cangjie5_words.bin"
+    override val baseTableAsset: String = "tableime/cangjie_base.bin"
+    override val extendedTableAsset: String = "tableime/cangjie_extended.bin"
+    override val nextWordsAsset: String = "tableime/cangjie_words.bin"
 
     private val RADICALS = mapOf(
         'a' to "日",

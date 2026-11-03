@@ -2,11 +2,11 @@
 """
 Convert HeliBoard Table IME TSV dictionaries into fast binary (.bin) format.
 
-1. Code Table TSV (cangjie5_base.tsv, cangjie5_extended.tsv):
+1. Code Table TSV (cangjie_base.tsv, cangjie_extended.tsv):
    Input: code \t character
    Output: CJTB binary format (Header + 16-byte aligned Index + UTF-8 Data Pool)
 
-2. Word Predictor TSV (cangjie5_words.tsv):
+2. Word Predictor TSV (cangjie_words.tsv):
    Input: word \t pronunciation (or word only)
    Output: CJWP binary format (Header + Offset Table + UTF-8 Word Pool)
 """
@@ -139,14 +139,14 @@ if __name__ == '__main__':
     project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
     assets_dir = os.path.join(project_root, 'app', 'src', 'main', 'assets', 'tableime')
 
-    cangjie_base_tsv = os.path.join(assets_dir, 'cangjie5_base.tsv')
-    cangjie_base_bin = os.path.join(assets_dir, 'cangjie5_base.bin')
+    cangjie_base_tsv = os.path.join(assets_dir, 'cangjie_base.tsv')
+    cangjie_base_bin = os.path.join(assets_dir, 'cangjie_base.bin')
     convert_code_table(cangjie_base_tsv, cangjie_base_bin)
 
-    cangjie_ext_tsv = os.path.join(assets_dir, 'cangjie5_extended.tsv')
-    cangjie_ext_bin = os.path.join(assets_dir, 'cangjie5_extended.bin')
+    cangjie_ext_tsv = os.path.join(assets_dir, 'cangjie_extended.tsv')
+    cangjie_ext_bin = os.path.join(assets_dir, 'cangjie_extended.bin')
     convert_code_table(cangjie_ext_tsv, cangjie_ext_bin)
 
-    words_tsv = os.path.join(assets_dir, 'cangjie5_words.tsv')
-    words_bin = os.path.join(assets_dir, 'cangjie5_words.bin')
+    words_tsv = os.path.join(assets_dir, 'cangjie_words.tsv')
+    words_bin = os.path.join(assets_dir, 'cangjie_words.bin')
     convert_word_predictor(words_tsv, words_bin)

@@ -88,7 +88,7 @@ object QuickSpec : TableImeSpec {
     override val maxCodeLength: Int = 2 // Quick takes at most 2 keys (first + last radical)
     override val baseTableAsset: String = "tableime/quick_base.tsv"
     override val extendedTableAsset: String = "tableime/quick_extended.tsv"
-    override val nextWordsAsset: String = "tableime/cangjie5_words.bin" // Optional: reuse Cantonese / Chinese word predictor
+    override val nextWordsAsset: String = "tableime/cangjie_words.bin" // Optional: reuse Cantonese / Chinese word predictor
 
     // Quick shares the standard 24/25 Cangjie radical mapping (A-Z -> 日-重)
     private val RADICALS = mapOf(
