@@ -141,12 +141,10 @@ class TableImeTest {
 
     @Test
     fun testLookupRealAsset() {
-        val file = java.io.File("src/main/assets/tableime/cangjie_base.tsv")
-        val entries = file.readLines().filter { it.isNotBlank() }.mapNotNull { line ->
-            val tab = line.indexOf('\t')
-            if (tab != -1) TableImeTable.Entry(line.substring(0, tab).trim().lowercase(), line.substring(tab + 1).trim()) else null
-        }
-        val table = TableImeTable(entries)
+        val file = java.io.File("src/main/assets/tableime/cangjie_base.bin")
+        assertTrue(file.exists())
+        val source = TableImeTable.BinarySource(java.nio.ByteBuffer.wrap(file.readBytes()))
+        val table = TableImeTable(source)
         val resJmso = table.lookup("jmso")
         println("Lookup jmso: $resJmso")
         assertTrue(resJmso.contains("家"))
@@ -256,18 +254,11 @@ class TableImeTest {
 
     @Test
     fun testWordPredictorRealAsset() {
-        val file = java.io.File("src/main/assets/tableime/cangjie_words.tsv")
+        val file = java.io.File("src/main/assets/tableime/cangjie_words.bin")
         assertTrue(file.exists())
-        val words = file.readLines().mapNotNull { line ->
-            val trimmed = line.trim()
-            if (trimmed.isEmpty()) null
-            else {
-                val tabIdx = trimmed.indexOf('\t')
-                if (tabIdx != -1) trimmed.substring(0, tabIdx).trim() else trimmed
-            }
-        }
-        assertTrue(words.size > 100000)
-        val predictor = helium314.keyboard.latin.tableime.TableImeWordPredictor(words)
+        val source = TableImeWordPredictor.BinarySource(java.nio.ByteBuffer.wrap(file.readBytes()))
+        assertTrue(source.size > 100000)
+        val predictor = helium314.keyboard.latin.tableime.TableImeWordPredictor(source)
 
         val resHeong = predictor.predict("香")
         println("Real asset predict 香: ${resHeong.take(10)}")
