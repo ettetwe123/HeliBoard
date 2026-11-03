@@ -124,4 +124,6 @@
     <string name="table_ime_extended_summary">搜尋擴展字碼表（更多候選字）</string>
     <string name="table_ime_freq_words_title">常用字置前</string>
     <string name="table_ime_freq_words_summary">打字時將揀選過的字排在候選字前列</string>
+    <string name="table_ime_predictions_title">聯想詞預測</string>
+    <string name="table_ime_predictions_summary">打字選定後提供後續詞語聯想建議</string>
 </resources>

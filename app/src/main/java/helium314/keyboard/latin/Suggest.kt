@@ -90,7 +90,8 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
         val frequentWordCounts = if (adjustFreq) TableImeUserHistory.getFrequentWordCounts(context, combiningSpec) else null
 
         if (rawCode.isEmpty()) {
-            if (!Settings.getValues().mBigramPredictionEnabled) {
+            val enablePredictions = currentSubtype.getExtraValueOf(Constants.Subtype.ExtraValue.TABLE_IME_PREDICTIONS)?.toBoolean() ?: true
+            if (!enablePredictions) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }
             val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)

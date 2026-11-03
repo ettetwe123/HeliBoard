@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.latin.tableime
 
+import android.content.Context
 import helium314.keyboard.latin.LastComposedWord
 import helium314.keyboard.latin.LatinIME
 import helium314.keyboard.latin.RichInputMethodManager
@@ -71,6 +72,11 @@ object TableImeHandler {
         if (!currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)) return
         val context = Settings.getCurrentContext() ?: return
         TableImeUserHistory.recordWord(context, combiningSpec!!, word)
+    }
+
+    @JvmStatic
+    fun onFinishInput(context: Context) {
+        TableImeUserHistory.flush(context)
     }
 
     /**

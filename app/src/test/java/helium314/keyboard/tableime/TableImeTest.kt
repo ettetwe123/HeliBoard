@@ -240,7 +240,7 @@ class TableImeTest {
 
     @Test
     fun testWordPredictorRealAsset() {
-        val file = java.io.File("src/main/assets/tableime/jyut6ping3_words.tsv")
+        val file = java.io.File("src/main/assets/tableime/cangjie5_words.tsv")
         assertTrue(file.exists())
         val words = file.readLines().mapNotNull { line ->
             val trimmed = line.trim()
@@ -293,7 +293,7 @@ class TableImeTest {
         kotlin.test.assertNull(pred.autoCorrectionWord)
         kotlin.test.assertNull(pred.autoCorrectionWordInfo)
 
-        assertEquals("tableime/jyut6ping3_words.tsv", CangjieSpec.nextWordsAsset)
+        assertEquals("tableime/cangjie5_words.bin", CangjieSpec.nextWordsAsset)
     }
 
     @Test
@@ -386,6 +386,136 @@ class TableImeTest {
         assertEquals("蕉", sortedList[0])
         assertEquals("港", sortedList[1])
         // Remaining unranked ones follow
+        assertTrue(sortedList.contains("水"))
+        assertTrue(sortedList.contains("腸"))
+        assertTrue(sortedList.contains("味"))
+    }
+
+    private fun createBinaryTable(entries: Map<String, List<String>>): TableImeTable.BinarySource {
+        val sortedCodes = entries.keys.sorted()
+        val candData = java.io.ByteArrayOutputStream()
+        val indexList = mutableListOf<Triple<ByteArray, Int, Int>>()
+
+        for (code in sortedCodes) {
+            val codeBytes = code.toByteArray(Charsets.US_ASCII)
+            val codePadded = ByteArray(8)
+            System.arraycopy(codeBytes, 0, codePadded, 0, codeBytes.size)
+
+            val cands = entries[code] ?: emptyList()
+            val offset = candData.size()
+            for (c in cands) {
+                val b = c.toByteArray(Charsets.UTF_8)
+                candData.write(b.size)
+                candData.write(b)
+            }
+            indexList.add(Triple(codePadded, offset, cands.size))
+        }
+
+        val totalSize = 16 + indexList.size * 16 + candData.size()
+        val buf = java.nio.ByteBuffer.allocate(totalSize).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buf.put(byteArrayOf('C'.code.toByte(), 'J'.code.toByte(), 'T'.code.toByte(), 'B'.code.toByte()))
+        buf.putShort(1) // version
+        buf.putShort(0) // flags
+        buf.putInt(indexList.size)
+        buf.putInt(16 + indexList.size * 16)
+
+        for ((codePadded, offset, count) in indexList) {
+            buf.put(codePadded)
+            buf.putInt(offset)
+            buf.putShort(count.toShort())
+            buf.putShort(0) // padding
+        }
+        buf.put(candData.toByteArray())
+        buf.position(0)
+        return TableImeTable.BinarySource(buf)
+    }
+
+    private fun createBinaryWordPredictor(words: List<String>): TableImeWordPredictor.BinarySource {
+        val sortedWords = words.sortedBy { it }
+        val wordData = java.io.ByteArrayOutputStream()
+        val offsets = mutableListOf<Int>()
+
+        for (w in sortedWords) {
+            offsets.add(wordData.size())
+            val b = w.toByteArray(Charsets.UTF_8)
+            wordData.write(b.size)
+            wordData.write(b)
+        }
+
+        val totalSize = 16 + offsets.size * 4 + wordData.size()
+        val buf = java.nio.ByteBuffer.allocate(totalSize).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buf.put(byteArrayOf('C'.code.toByte(), 'J'.code.toByte(), 'W'.code.toByte(), 'P'.code.toByte()))
+        buf.putShort(1)
+        buf.putShort(0)
+        buf.putInt(offsets.size)
+        buf.putInt(16 + offsets.size * 4)
+
+        for (off in offsets) {
+            buf.putInt(off)
+        }
+        buf.put(wordData.toByteArray())
+        buf.position(0)
+        return TableImeWordPredictor.BinarySource(buf)
+    }
+
+    @Test
+    fun testBinaryTableSourceLookup() {
+        val baseMap = mapOf(
+            "a" to listOf("日", "曰"),
+            "aa" to listOf("昌"),
+            "aaa" to listOf("晶"),
+            "ab" to listOf("明"),
+            "b" to listOf("月"),
+            "d" to listOf("木"),
+            "dd" to listOf("林"),
+            "ddd" to listOf("森")
+        )
+        val extMap = mapOf(
+            "aa" to listOf("昍"),
+            "ab" to listOf("冐")
+        )
+
+        val baseSource = createBinaryTable(baseMap)
+        val extSource = createBinaryTable(extMap)
+        val table = TableImeTable(baseSource, extSource)
+
+        // Exact match 'a' without extended
+        val resA = table.lookup("a", includeExtended = false)
+        assertEquals("日", resA[0])
+        assertEquals("曰", resA[1])
+        assertTrue(resA.contains("昌"))
+        assertTrue(resA.contains("晶"))
+        assertTrue(resA.contains("明"))
+        assertFalse(resA.contains("昍"))
+
+        // Exact match 'a' with extended
+        val resAExt = table.lookup("a", includeExtended = true)
+        assertTrue(resAExt.contains("昍"))
+
+        // Exact match 'ab'
+        val resAB = table.lookup("ab", includeExtended = true)
+        assertEquals("明", resAB[0])
+        assertEquals("冐", resAB[1])
+
+        // Option A ordering with counts
+        val counts = mapOf("曰" to 20, "日" to 10, "明" to 30, "昌" to 5)
+        val resCounts = table.lookup("a", frequentWordCounts = counts)
+        assertEquals(listOf("曰", "日", "明", "昌", "晶"), resCounts)
+    }
+
+    @Test
+    fun testBinaryWordPredictorSource() {
+        val words = listOf("香港", "香水", "香腸", "香蕉", "香味")
+        val predictor = TableImeWordPredictor(createBinaryWordPredictor(words))
+
+        val defaultList = predictor.predict("香")
+        assertTrue(defaultList.contains("港"))
+        assertTrue(defaultList.contains("蕉"))
+
+        val counts = mapOf("蕉" to 10, "港" to 3)
+        val sortedList = predictor.predict("香", frequentWordCounts = counts)
+        assertEquals("蕉", sortedList[0])
+        assertEquals("港", sortedList[1])
         assertTrue(sortedList.contains("水"))
         assertTrue(sortedList.contains("腸"))
         assertTrue(sortedList.contains("味"))

@@ -275,6 +275,27 @@ fun SubtypeScreen(
                             )
                         }
                     }
+                    val checkedPredictions = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_PREDICTIONS)?.toBoolean() ?: true
+                    WithSmallTitle(stringResource(R.string.table_ime_predictions_title)) {
+                        ActionRow {
+                            Text(
+                                stringResource(R.string.table_ime_predictions_summary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp)
+                            )
+                            Switch(
+                                checked = checkedPredictions,
+                                onCheckedChange = {
+                                    if (it) {
+                                        setCurrentSubtype(currentSubtype.without(ExtraValue.TABLE_IME_PREDICTIONS))
+                                    } else {
+                                        setCurrentSubtype(currentSubtype.with(ExtraValue.TABLE_IME_PREDICTIONS, "false"))
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
                 HorizontalDivider()
                 Text(

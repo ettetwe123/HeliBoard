@@ -60,6 +60,7 @@ import helium314.keyboard.latin.inputlogic.InputLogic;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsSubtype;
 import helium314.keyboard.latin.settings.SettingsValues;
+import helium314.keyboard.latin.tableime.TableImeHandler;
 import helium314.keyboard.latin.tableime.TableImeRegistry;
 import helium314.keyboard.latin.suggestions.SuggestionStripView;
 import helium314.keyboard.latin.suggestions.SuggestionStripViewAccessor;
@@ -979,6 +980,7 @@ public class LatinIME extends InputMethodService implements
         // Should do the following in onFinishInputInternal but until JB MR2 it's not called :(
         mInputLogic.finishInput();
         mKeyboardActionListener.resetMetaState();
+        TableImeHandler.onFinishInput(this);
     }
 
     protected void deallocateMemory() {

@@ -101,6 +101,9 @@ public final class Constants {
             /** Indicates whether frequent characters should be prioritized for Table IME */
             public static final String TABLE_IME_FREQ_WORDS = "TableImeFreqWords";
 
+            /** Indicates whether next-word predictions should be enabled for Table IME */
+            public static final String TABLE_IME_PREDICTIONS = "TableImePredictions";
+
             private ExtraValue() {
                 // This utility class is not publicly instantiable.
             }

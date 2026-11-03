@@ -37,8 +37,7 @@ object TableImeRegistry {
         // Load synchronously if needed on first query
         synchronized(tables) {
             tables[spec.id]?.let { return it }
-            val base = TableImeTable.loadFromAsset(context, spec.baseTableAsset)
-            val table = TableImeTable(base)
+            val table = TableImeTable.loadFromAsset(context, spec.baseTableAsset)
             tables[spec.id] = table
             return table
         }
@@ -63,10 +62,10 @@ object TableImeRegistry {
         executor.execute {
             try {
                 val table = getTable(context, combiningRules)
-                if (loadExtended && spec.extendedTableAsset != null && table != null && table.extendedEntries == null) {
-                    val ext = TableImeTable.loadFromAsset(context, spec.extendedTableAsset!!)
-                    table.extendedEntries = ext
-                    Log.i(TAG, "Loaded extended table for ${spec.id}: ${ext.size} entries")
+                if (loadExtended && spec.extendedTableAsset != null && table != null && table.extendedSource == null) {
+                    val ext = TableImeTable.loadSourceFromAsset(context, spec.extendedTableAsset!!)
+                    table.extendedSource = ext
+                    Log.i(TAG, "Loaded extended table for ${spec.id}")
                 }
                 if (spec.nextWordsAsset != null && !wordPredictors.containsKey(spec.id)) {
                     getWordPredictor(context, combiningRules)
@@ -82,13 +81,13 @@ object TableImeRegistry {
         val spec = getSpec(combiningRules) ?: return
         val extAsset = spec.extendedTableAsset ?: return
         val table = tables[spec.id] ?: getTable(context, combiningRules) ?: return
-        if (table.extendedEntries == null) {
+        if (table.extendedSource == null) {
             executor.execute {
                 synchronized(table) {
-                    if (table.extendedEntries == null) {
-                        val ext = TableImeTable.loadFromAsset(context, extAsset)
-                        table.extendedEntries = ext
-                        Log.i(TAG, "Loaded extended table on demand for ${spec.id}: ${ext.size} entries")
+                    if (table.extendedSource == null) {
+                        val ext = TableImeTable.loadSourceFromAsset(context, extAsset)
+                        table.extendedSource = ext
+                        Log.i(TAG, "Loaded extended table on demand for ${spec.id}")
                     }
                 }
             }

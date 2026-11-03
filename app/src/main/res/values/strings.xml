@@ -492,6 +492,8 @@
     <string name="table_ime_extended_summary">Search extended character dictionary (more candidates)</string>
     <string name="table_ime_freq_words_title">Frequent characters first</string>
     <string name="table_ime_freq_words_summary">Prioritize previously selected characters in candidate list</string>
+    <string name="table_ime_predictions_title">Next-word suggestions</string>
+    <string name="table_ime_predictions_summary">Predict and suggest next words after committing a character</string>
     <!-- This string is displayed in a language list that allows to choose a language for
 suggestions in a software keyboard. This setting won't give suggestions in any particular
 language, hence "No language". -->

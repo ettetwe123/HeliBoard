@@ -551,4 +551,10 @@
     <string name="gesture_data_swipe_o_scope">滑行输入数据可视化工具：&lt;a href=%s&gt;Swipe-O-Scope&lt;/a&gt;</string>
     <string name="show_dpad_key">方向键</string>
     <string name="recent_emojis_cleared">已清除最近使用的表情符号</string>
+    <string name="table_ime_extended_title">包含罕用字（扩展字表）</string>
+    <string name="table_ime_extended_summary">搜寻扩展字码表（更多候选字）</string>
+    <string name="table_ime_freq_words_title">常用字置前</string>
+    <string name="table_ime_freq_words_summary">打字时将选取过的字排在候选字前列</string>
+    <string name="table_ime_predictions_title">联想词预测</string>
+    <string name="table_ime_predictions_summary">输入选定后提供后续词语联想建议</string>
 </resources>
