@@ -16,6 +16,10 @@ import os
 import struct
 from collections import OrderedDict
 
+# Maximum codepoint supported by standard mobile CJK fonts (CJK Extension B: U+20000 - U+2A6DF).
+# Characters beyond Ext B (Ext C/D/E/F/G/H/I) render as tofu boxes (▯) on Android and are filtered out.
+MAX_CODEPOINT = 0x2A6DF
+
 def convert_code_table(tsv_path, bin_path):
     # Map code -> list of unique candidate strings, preserving original TSV order
     table = OrderedDict()
@@ -30,6 +34,8 @@ def convert_code_table(tsv_path, bin_path):
                 code = parts[0].strip().lower()
                 text = parts[1].strip()
                 if code and text:
+                    if any(ord(c) > MAX_CODEPOINT for c in text):
+                        continue
                     if code not in table:
                         table[code] = []
                     if text not in table[code]:

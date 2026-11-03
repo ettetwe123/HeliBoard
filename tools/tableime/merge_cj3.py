@@ -5,10 +5,14 @@ Merge Cangjie 3 dictionaries (cj3-special.txt & cj3.txt) into HeliBoard Cangjie 
 - Preserves original Cangjie 5 ordering for existing codes.
 - Common / BMP characters go to cangjie_base.tsv (e.g. ysyq -> 遲).
 - Supplementary / rare characters go to cangjie_extended.tsv.
+- Exclude characters beyond CJK Extension B (> U+2A6DF) to avoid tofu boxes (▯) on Android/mobile fonts.
 """
 
 import os
 import sys
+
+# Max codepoint for CJK Extension B; higher ranges (Ext C/D/E/F/G/H/I) lack mobile font support and render as tofu
+MAX_CODEPOINT = 0x2A6DF
 
 def merge():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +41,7 @@ def merge():
             parts = line.split('\t')
             if len(parts) >= 2:
                 c, t = parts[0].strip().lower(), parts[1].strip()
-                if c and t:
+                if c and t and ord(t[0]) <= MAX_CODEPOINT:
                     base_entries.append((c, t))
                     base_chars.add(t)
                     seen.add((c, t))
@@ -51,7 +55,7 @@ def merge():
             parts = line.split('\t')
             if len(parts) >= 2:
                 c, t = parts[0].strip().lower(), parts[1].strip()
-                if c and t:
+                if c and t and ord(t[0]) <= MAX_CODEPOINT:
                     ext_entries.append((c, t))
                     seen.add((c, t))
 
@@ -74,7 +78,7 @@ def merge():
                 if len(parts) >= 2:
                     c = parts[0].strip().lower()
                     t = parts[1].strip()
-                    if c.isalpha() and len(c) <= 5 and len(t) == 1:
+                    if c.isalpha() and len(c) <= 5 and len(t) == 1 and ord(t[0]) <= MAX_CODEPOINT:
                         res.append((c, t))
         return res
 
