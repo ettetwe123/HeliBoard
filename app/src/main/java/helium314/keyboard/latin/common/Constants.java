@@ -104,6 +104,9 @@ public final class Constants {
             /** Indicates whether next-word predictions should be enabled for Table IME */
             public static final String TABLE_IME_PREDICTIONS = "TableImePredictions";
 
+            /** Indicates whether learned next-word associations should be enabled for Table IME */
+            public static final String TABLE_IME_LEARN_PREDICTIONS = "TableImeLearnPredictions";
+
             private ExtraValue() {
                 // This utility class is not publicly instantiable.
             }

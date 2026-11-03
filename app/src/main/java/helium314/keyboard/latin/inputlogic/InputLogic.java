@@ -687,6 +687,7 @@ public final class InputLogic {
             inputTransaction.setDidAffectContents();
             inputTransaction.setRequiresUpdateSuggestions();
         } else if (TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())) {
+            TableImeHandler.resetLastCommittedWord();
             mConnection.commitText("", 1);
             inputTransaction.setDidAffectContents();
             inputTransaction.setRequiresUpdateSuggestions();

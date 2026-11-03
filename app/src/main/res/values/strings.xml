@@ -494,6 +494,13 @@
     <string name="table_ime_freq_words_summary">Prioritize previously selected characters in candidate list</string>
     <string name="table_ime_predictions_title">Next-word suggestions</string>
     <string name="table_ime_predictions_summary">Predict and suggest next words after committing a character</string>
+    <string name="table_ime_learn_predictions_title">Learn word associations</string>
+    <string name="table_ime_learn_predictions_summary">Automatically learn word pairs and phrases from typing habits</string>
+    <string name="table_ime_clear_freq_words_title">Clear character frequency history</string>
+    <string name="table_ime_clear_freq_words_confirm">Are you sure you want to clear your character frequency history?</string>
+    <string name="table_ime_clear_learned_predictions_title">Clear learned word associations</string>
+    <string name="table_ime_clear_learned_predictions_confirm">Are you sure you want to clear all learned word pairs and associations?</string>
+    <string name="table_ime_history_cleared">Cleared</string>
     <!-- This string is displayed in a language list that allows to choose a language for
 suggestions in a software keyboard. This setting won't give suggestions in any particular
 language, hence "No language". -->

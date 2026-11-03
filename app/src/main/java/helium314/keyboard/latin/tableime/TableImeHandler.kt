@@ -12,6 +12,17 @@ import helium314.keyboard.latin.inputlogic.InputLogic
 import helium314.keyboard.latin.settings.Settings
 
 object TableImeHandler {
+
+    @Volatile
+    private var lastCommittedWord: String? = null
+
+    @JvmStatic
+    fun getLastCommittedWord(): String? = lastCommittedWord
+
+    @JvmStatic
+    fun resetLastCommittedWord() {
+        lastCommittedWord = null
+    }
     class CommitResult(val text: String, val commitType: Int)
 
     @JvmStatic
@@ -69,13 +80,25 @@ object TableImeHandler {
     fun onWordCommitted(combiningSpec: String?, word: String) {
         if (!isTableIme(combiningSpec) || word.isEmpty()) return
         val currentSubtype = RichInputMethodManager.getInstance().currentSubtype
-        if (!currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)) return
         val context = Settings.getCurrentContext() ?: return
-        TableImeUserHistory.recordWord(context, combiningSpec!!, word)
+
+        // 1. Record single character frequency
+        if (currentSubtype.hasExtraValue(Constants.Subtype.ExtraValue.TABLE_IME_FREQ_WORDS)) {
+            TableImeUserHistory.recordWord(context, combiningSpec!!, word)
+        }
+
+        // 2. Record dynamic bigram association
+        val learnEnabled = currentSubtype.getExtraValueOf(Constants.Subtype.ExtraValue.TABLE_IME_LEARN_PREDICTIONS)?.toBoolean() ?: true
+        val prev = lastCommittedWord
+        if (learnEnabled && !prev.isNullOrEmpty()) {
+            TableImeUserHistory.recordBigram(context, combiningSpec!!, prev, word)
+        }
+        lastCommittedWord = word
     }
 
     @JvmStatic
     fun onFinishInput(context: Context) {
+        lastCommittedWord = null
         TableImeUserHistory.flush(context)
     }
 

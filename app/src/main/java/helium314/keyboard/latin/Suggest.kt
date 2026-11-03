@@ -30,6 +30,7 @@ import helium314.keyboard.latin.utils.useBackgroundGathering
 import helium314.keyboard.latin.tableime.TableImeRegistry
 import helium314.keyboard.latin.tableime.TableImeUserHistory
 import helium314.keyboard.latin.tableime.TableImeSuggestedWords
+import helium314.keyboard.latin.tableime.TableImeHandler
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -94,13 +95,30 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
             if (!enablePredictions) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }
-            val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)
-                ?: return TableImeSuggestedWords.empty(sequenceNumber)
-            val prevWord = ngramContext.getNthPrevWord(1)?.toString() ?: ""
+            val prevWord = ngramContext.getNthPrevWord(1)?.toString()?.takeIf { it.isNotEmpty() }
+                ?: TableImeHandler.getLastCommittedWord()
+                ?: ""
             if (prevWord.isEmpty()) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }
-            val candidates = predictor.predict(prevWord, frequentWordCounts = frequentWordCounts)
+
+            // 1. User-learned dynamic associations (if enabled)
+            val learnEnabled = currentSubtype.getExtraValueOf(Constants.Subtype.ExtraValue.TABLE_IME_LEARN_PREDICTIONS)?.toBoolean() ?: true
+            val learned = if (learnEnabled) {
+                TableImeUserHistory.getLearnedPredictions(context, combiningSpec, prevWord)
+            } else {
+                emptyList()
+            }
+
+            // 2. Static word predictor
+            val predictor = TableImeRegistry.getWordPredictor(context, combiningSpec)
+            val staticCandidates = predictor?.predict(prevWord, frequentWordCounts = frequentWordCounts) ?: emptyList()
+
+            // Merge: learned first, then static candidates (deduplicated)
+            val candidates = LinkedHashSet<String>(learned.size + staticCandidates.size)
+            candidates.addAll(learned)
+            candidates.addAll(staticCandidates)
+
             if (candidates.isEmpty()) {
                 return TableImeSuggestedWords.empty(sequenceNumber)
             }

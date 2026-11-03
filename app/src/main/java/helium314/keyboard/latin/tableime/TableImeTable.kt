@@ -68,39 +68,44 @@ class TableImeTable(
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()
-        val exactMatches = LinkedHashSet<String>()
+        val baseExact = LinkedHashSet<String>()
+        val basePrefix = LinkedHashSet<String>()
+        val extExact = LinkedHashSet<String>()
+        val extPrefix = LinkedHashSet<String>()
 
         // 1. Exact matches from base
-        baseSource.collectExactMatches(query, exactMatches, maxCandidates)
+        baseSource.collectExactMatches(query, baseExact, maxCandidates)
 
-        // 2. Exact matches from extended (if enabled and loaded)
+        // 2. Prefix matches from base (common words always come before extended rare characters)
+        if (baseExact.size < maxCandidates) {
+            baseSource.collectPrefixMatches(query, basePrefix, maxCandidates - baseExact.size)
+        }
+
+        // 3. Extended matches (if enabled and loaded, placed after base entries)
         val ext = if (includeExtended) extendedSource else null
-        if (ext != null && exactMatches.size < maxCandidates) {
-            ext.collectExactMatches(query, exactMatches, maxCandidates)
-        }
-
-        val prefixMatches = LinkedHashSet<String>()
-
-        // 3. Prefix matches from base
-        if (exactMatches.size + prefixMatches.size < maxCandidates) {
-            baseSource.collectPrefixMatches(query, prefixMatches, maxCandidates - exactMatches.size)
-        }
-
-        // 4. Prefix matches from extended
-        if (ext != null && exactMatches.size + prefixMatches.size < maxCandidates) {
-            ext.collectPrefixMatches(query, prefixMatches, maxCandidates - exactMatches.size)
+        if (ext != null) {
+            val remaining = maxCandidates - baseExact.size - basePrefix.size
+            if (remaining > 0) {
+                ext.collectExactMatches(query, extExact, remaining)
+            }
+            val remainingAfterExact = maxCandidates - baseExact.size - basePrefix.size - extExact.size
+            if (remainingAfterExact > 0) {
+                ext.collectPrefixMatches(query, extPrefix, remainingAfterExact)
+            }
         }
 
         if (frequentWordCounts.isNullOrEmpty()) {
-            val candidates = ArrayList<String>(exactMatches.size + prefixMatches.size)
-            candidates.addAll(exactMatches)
-            candidates.addAll(prefixMatches)
+            val candidates = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size)
+            candidates.addAll(baseExact)
+            candidates.addAll(basePrefix)
+            candidates.addAll(extExact)
+            candidates.addAll(extPrefix)
             return candidates
         }
 
-        // Option A: Exact matches (frequent sorted by count DESC, then non-frequent in table order),
-        // followed by Prefix matches (frequent sorted by count DESC, then non-frequent in table order).
-        val result = ArrayList<String>(exactMatches.size + prefixMatches.size)
+        // Option A: Base exact -> Base prefix -> Ext exact -> Ext prefix
+        // (within each section, frequent words sorted by count DESC, then non-frequent in table order).
+        val result = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size)
 
         fun appendPartition(matches: Iterable<String>) {
             val frequentList = ArrayList<String>()
@@ -121,8 +126,10 @@ class TableImeTable(
             result.addAll(nonFrequentList)
         }
 
-        appendPartition(exactMatches)
-        appendPartition(prefixMatches)
+        appendPartition(baseExact)
+        appendPartition(basePrefix)
+        appendPartition(extExact)
+        appendPartition(extPrefix)
         return result
     }
 

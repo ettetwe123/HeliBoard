@@ -163,4 +163,11 @@
     <string name="table_ime_freq_words_summary">打字時將選取過的字排在候選字前列</string>
     <string name="table_ime_predictions_title">聯想詞預測</string>
     <string name="table_ime_predictions_summary">打字選定後提供後續詞語聯想建議</string>
+    <string name="table_ime_learn_predictions_title">自學聯想詞</string>
+    <string name="table_ime_learn_predictions_summary">根據打字習慣自動學習前後詞語組合</string>
+    <string name="table_ime_clear_freq_words_title">清除個人字頻記錄</string>
+    <string name="table_ime_clear_freq_words_confirm">確定要清除所有個人常用字頻記錄嗎？</string>
+    <string name="table_ime_clear_learned_predictions_title">清除自學聯想詞</string>
+    <string name="table_ime_clear_learned_predictions_confirm">確定要清除所有自動學習的前後詞語組合嗎？</string>
+    <string name="table_ime_history_cleared">已清除</string>
 </resources>

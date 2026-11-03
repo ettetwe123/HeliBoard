@@ -1,6 +1,7 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +45,7 @@ import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.common.Constants.Subtype.ExtraValue
 import helium314.keyboard.latin.common.Links
 import helium314.keyboard.latin.tableime.TableImeRegistry
+import helium314.keyboard.latin.tableime.TableImeUserHistory
 import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.LocaleUtils.localizedDisplayName
 import helium314.keyboard.latin.dictionary.getDictionaryLocales
@@ -130,6 +132,8 @@ fun SubtypeScreen(
     var showKeyOrderDialog by remember { mutableStateOf(false) }
     var showHintOrderDialog by remember { mutableStateOf(false) }
     var showMorePopupsDialog by remember { mutableStateOf(false) }
+    var showClearFreqDialog by remember { mutableStateOf(false) }
+    var showClearPredictionsDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val customMainLayouts = LayoutUtilsCustom.getLayoutFiles(LayoutType.MAIN, ctx, currentSubtype.locale).map { it.name }
     SearchScreen(
@@ -296,6 +300,45 @@ fun SubtypeScreen(
                             )
                         }
                     }
+                    val checkedLearn = currentSubtype.getExtraValueOf(ExtraValue.TABLE_IME_LEARN_PREDICTIONS)?.toBoolean() ?: true
+                    WithSmallTitle(stringResource(R.string.table_ime_learn_predictions_title)) {
+                        ActionRow {
+                            Text(
+                                stringResource(R.string.table_ime_learn_predictions_summary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp)
+                            )
+                            Switch(
+                                checked = checkedLearn,
+                                onCheckedChange = {
+                                    if (it) {
+                                        setCurrentSubtype(currentSubtype.without(ExtraValue.TABLE_IME_LEARN_PREDICTIONS))
+                                    } else {
+                                        setCurrentSubtype(currentSubtype.with(ExtraValue.TABLE_IME_LEARN_PREDICTIONS, "false"))
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    ActionRow(onClick = { showClearFreqDialog = true }) {
+                        Text(
+                            stringResource(R.string.table_ime_clear_freq_words_title),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 10.dp)
+                        )
+                    }
+                    ActionRow(onClick = { showClearPredictionsDialog = true }) {
+                        Text(
+                            stringResource(R.string.table_ime_clear_learned_predictions_title),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 10.dp)
+                        )
+                    }
                 }
                 HorizontalDivider()
                 Text(
@@ -416,6 +459,38 @@ fun SubtypeScreen(
                 getItemName = { stringResource(LocaleKeyboardInfos.morePopupKeysResId(it)) },
                 selectedItem = value,
                 onItemSelected = { setCurrentSubtype(currentSubtype.with(ExtraValue.MORE_POPUPS, it)) }
+            )
+        }
+        if (showClearFreqDialog) {
+            ConfirmationDialog(
+                onDismissRequest = { showClearFreqDialog = false },
+                title = { Text(stringResource(R.string.table_ime_clear_freq_words_title)) },
+                content = { Text(stringResource(R.string.table_ime_clear_freq_words_confirm)) },
+                confirmButtonText = stringResource(R.string.delete),
+                onConfirmed = {
+                    val spec = currentSubtype.getExtraValueOf(ExtraValue.COMBINING_RULES)
+                    if (spec != null) {
+                        TableImeUserHistory.clearFrequentWords(ctx, spec)
+                        Toast.makeText(ctx, ctx.getString(R.string.table_ime_history_cleared), Toast.LENGTH_SHORT).show()
+                    }
+                    showClearFreqDialog = false
+                }
+            )
+        }
+        if (showClearPredictionsDialog) {
+            ConfirmationDialog(
+                onDismissRequest = { showClearPredictionsDialog = false },
+                title = { Text(stringResource(R.string.table_ime_clear_learned_predictions_title)) },
+                content = { Text(stringResource(R.string.table_ime_clear_learned_predictions_confirm)) },
+                confirmButtonText = stringResource(R.string.delete),
+                onConfirmed = {
+                    val spec = currentSubtype.getExtraValueOf(ExtraValue.COMBINING_RULES)
+                    if (spec != null) {
+                        TableImeUserHistory.clearLearnedPredictions(ctx, spec)
+                        Toast.makeText(ctx, ctx.getString(R.string.table_ime_history_cleared), Toast.LENGTH_SHORT).show()
+                    }
+                    showClearPredictionsDialog = false
+                }
             )
         }
     }

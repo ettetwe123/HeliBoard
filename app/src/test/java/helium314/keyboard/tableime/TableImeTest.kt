@@ -8,12 +8,18 @@ import helium314.keyboard.latin.tableime.CangjieSpec
 import helium314.keyboard.latin.tableime.TableImeCombiner
 import helium314.keyboard.latin.tableime.TableImeRegistry
 import helium314.keyboard.latin.tableime.TableImeTable
+import helium314.keyboard.latin.tableime.TableImeUserHistory
 import helium314.keyboard.latin.tableime.TableImeWordPredictor
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@RunWith(RobolectricTestRunner::class)
 class TableImeTest {
 
     @Test
@@ -68,6 +74,15 @@ class TableImeTest {
         assertEquals("木", resD[0])
         assertTrue(resD.contains("林"))
         assertTrue(resD.contains("森"))
+
+        // Common base prefix matches must precede obscure extended exact matches (e.g. '好' before '𠃑')
+        val testTable = TableImeTable(
+            listOf(TableImeTable.Entry("vnd", "好")),
+            listOf(TableImeTable.Entry("vn", "𠃑"))
+        )
+        val resVN = testTable.lookup("vn", includeExtended = true)
+        assertEquals("好", resVN[0])
+        assertEquals("𠃑", resVN[1])
     }
 
     @Test
@@ -520,5 +535,75 @@ class TableImeTest {
         assertTrue(sortedList.contains("水"))
         assertTrue(sortedList.contains("腸"))
         assertTrue(sortedList.contains("味"))
+    }
+
+    @Test
+    fun testTableImeUserHistoryFrequentWords() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tableId = "test_frequent_words"
+        TableImeUserHistory.clear(context, tableId)
+
+        // Record words
+        TableImeUserHistory.recordWord(context, tableId, "好")
+        TableImeUserHistory.recordWord(context, tableId, "好")
+        TableImeUserHistory.recordWord(context, tableId, "日")
+
+        val counts = TableImeUserHistory.getFrequentWordCounts(context, tableId)
+        assertEquals(2, counts["好"])
+        assertEquals(1, counts["日"])
+
+        // Clear frequent words
+        TableImeUserHistory.clearFrequentWords(context, tableId)
+        val clearedCounts = TableImeUserHistory.getFrequentWordCounts(context, tableId)
+        assertTrue(clearedCounts.isEmpty())
+    }
+
+    @Test
+    fun testTableImeUserHistoryBigramLearning() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tableId = "test_bigrams"
+        TableImeUserHistory.clear(context, tableId)
+
+        // Record bigrams
+        TableImeUserHistory.recordBigram(context, tableId, "香港", "人")
+        TableImeUserHistory.recordBigram(context, tableId, "香港", "人")
+        TableImeUserHistory.recordBigram(context, tableId, "香港", "茶餐廳")
+        TableImeUserHistory.recordBigram(context, tableId, "去", "玩")
+
+        // Exact match on prevWord
+        val predsExact = TableImeUserHistory.getLearnedPredictions(context, tableId, "香港")
+        assertEquals(listOf("人", "茶餐廳"), predsExact)
+
+        // Suffix match on longer context
+        val predsSuffix = TableImeUserHistory.getLearnedPredictions(context, tableId, "我愛香港")
+        assertEquals(listOf("人", "茶餐廳"), predsSuffix)
+
+        val predsSingle = TableImeUserHistory.getLearnedPredictions(context, tableId, "去")
+        assertEquals(listOf("玩"), predsSingle)
+
+        // Clear learned predictions
+        TableImeUserHistory.clearLearnedPredictions(context, tableId)
+        val clearedPreds = TableImeUserHistory.getLearnedPredictions(context, tableId, "香港")
+        assertTrue(clearedPreds.isEmpty())
+    }
+
+    @Test
+    fun testCandidatePriorityBasePrefixBeforeExtExact() {
+        // Base table: 'vnd' -> "好", 'vnf' -> "妳"
+        // Extended table: 'vn' -> "𠃑"
+        val baseMap = mapOf(
+            "vnd" to listOf("好"),
+            "vnf" to listOf("妳")
+        )
+        val extMap = mapOf(
+            "vn" to listOf("𠃑")
+        )
+        val baseSource = createBinaryTable(baseMap)
+        val extSource = createBinaryTable(extMap)
+        val table = TableImeTable(baseSource, extSource)
+
+        val cands = table.lookup("vn", includeExtended = true)
+        // Order: Base prefix ("好", "妳") MUST precede Extended exact ("𠃑")
+        assertEquals(listOf("好", "妳", "𠃑"), cands)
     }
 }

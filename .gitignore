@@ -12,6 +12,7 @@ app/.cxx
 app/.attach_*
 fastlane/Appfile
 tools/*.txt
+tools/**/*.txt
 *.patch
 *.diff
 *.sh
