@@ -11,7 +11,8 @@ import java.nio.ByteOrder
 
 class TableImeTable(
     val baseSource: Source,
-    @Volatile var extendedSource: Source? = null
+    @Volatile var extendedSource: Source? = null,
+    var spec: TableImeSpec? = null
 ) {
     data class Entry(val code: String, val text: String)
 
@@ -23,8 +24,9 @@ class TableImeTable(
     // Secondary constructors for backward compatibility with List<Entry>
     constructor(
         baseEntries: List<Entry>,
-        extendedEntries: List<Entry>? = null
-    ) : this(ListSource(baseEntries), extendedEntries?.let { ListSource(it) })
+        extendedEntries: List<Entry>? = null,
+        spec: TableImeSpec? = null
+    ) : this(ListSource(baseEntries), extendedEntries?.let { ListSource(it) }, spec)
 
     val baseEntries: List<Entry>
         get() = (baseSource as? ListSource)?.entries ?: emptyList()
@@ -66,7 +68,8 @@ class TableImeTable(
         maxCandidates: Int = 500,
         frequentWordCounts: Map<String, Int>? = null,
         enableFuzzy: Boolean = true,
-        isCommonWord: ((String) -> Boolean)? = null
+        isCommonWord: ((String) -> Boolean)? = null,
+        overrideSpec: TableImeSpec? = null
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         val query = code.lowercase()
@@ -75,11 +78,15 @@ class TableImeTable(
         val extExact = LinkedHashSet<String>()
         val extPrefix = LinkedHashSet<String>()
 
+        val activeSpec = overrideSpec ?: spec
+        val fuzzyPolicy = activeSpec?.fuzzyPolicy ?: TableImeFuzzyPolicy.DEFAULT
+        val rankingPolicy = activeSpec?.rankingPolicy ?: TableImeRankingPolicy.DEFAULT
+
         // 1. Exact matches from base
         baseSource.collectExactMatches(query, baseExact, maxCandidates)
 
         // 2. Prefix matches from base (common words always come before extended rare characters)
-        if (baseExact.size < maxCandidates) {
+        if (rankingPolicy.allowPrefixMatching && baseExact.size < maxCandidates) {
             baseSource.collectPrefixMatches(query, basePrefix, maxCandidates - baseExact.size)
         }
 
@@ -90,19 +97,32 @@ class TableImeTable(
             if (remaining > 0) {
                 ext.collectExactMatches(query, extExact, remaining)
             }
-            val remainingAfterExact = maxCandidates - baseExact.size - basePrefix.size - extExact.size
-            if (remainingAfterExact > 0) {
-                ext.collectPrefixMatches(query, extPrefix, remainingAfterExact)
+            if (rankingPolicy.allowPrefixMatching) {
+                val remainingAfterExact = maxCandidates - baseExact.size - basePrefix.size - extExact.size
+                if (remainingAfterExact > 0) {
+                    ext.collectPrefixMatches(query, extPrefix, remainingAfterExact)
+                }
             }
         }
 
         val directExactTotal = baseExact.size + extExact.size
+        val directTotal = baseExact.size + basePrefix.size + extExact.size + extPrefix.size
         val hasCommonDirect = isCommonWord != null && (baseExact.any(isCommonWord) || extExact.any(isCommonWord))
 
         val fuzzyMatches = LinkedHashSet<String>()
-        if (enableFuzzy && query.length >= 3 && (directExactTotal == 0 || !hasCommonDirect)) {
+        // Only trigger fuzzy when enabled in policy and parameter, length >= minCodeLength,
+        // and direct suggestions are fewer than directMatchThreshold
+        // and either no exact matches or no common exact matches exist
+        if (enableFuzzy && fuzzyPolicy.enabled && query.length >= fuzzyPolicy.minCodeLength && directTotal < fuzzyPolicy.directMatchThreshold && (directExactTotal == 0 || !hasCommonDirect)) {
             val fuzzyRaw = LinkedHashSet<String>()
-            collectFuzzyExactMatches(query, fuzzyRaw, maxCandidates, includeExtended)
+            collectFuzzyExactMatches(
+                query,
+                fuzzyRaw,
+                maxCandidates,
+                includeExtended,
+                allowDeletion = fuzzyPolicy.allowExtraKeyDeletion && basePrefix.isEmpty(),
+                neighborMap = fuzzyPolicy.neighborKeys
+            )
             for (w in fuzzyRaw) {
                 if (!baseExact.contains(w) && !basePrefix.contains(w) && !extExact.contains(w) && !extPrefix.contains(w)) {
                     fuzzyMatches.add(w)
@@ -128,6 +148,7 @@ class TableImeTable(
             }
 
             candidates.addAll(baseExact)
+            candidates.addAll(basePrefix)
             if (isCommonWord != null && fuzzyMatches.isNotEmpty()) {
                 val commonFuzzy = ArrayList<String>()
                 val remainingFuzzy = ArrayList<String>()
@@ -135,12 +156,10 @@ class TableImeTable(
                     if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
                 }
                 candidates.addAll(commonFuzzy)
-                candidates.addAll(basePrefix)
                 candidates.addAll(extExact)
                 candidates.addAll(extPrefix)
                 candidates.addAll(remainingFuzzy)
             } else {
-                candidates.addAll(basePrefix)
                 candidates.addAll(extExact)
                 candidates.addAll(extPrefix)
                 candidates.addAll(fuzzyMatches)
@@ -149,10 +168,11 @@ class TableImeTable(
         }
 
         // Option A: Base exact -> Base prefix -> Ext exact -> Ext prefix
-        // (within each section, frequent words sorted by count DESC, then non-frequent in table order).
+        // (within each section, frequent words sorted by count DESC, then non-frequent in table order.
+        // For exact matches, used words retain stable table order to avoid homocode leapfrog oscillation).
         val result = ArrayList<String>(baseExact.size + basePrefix.size + extExact.size + extPrefix.size + fuzzyMatches.size)
 
-        fun appendPartition(matches: Iterable<String>) {
+        fun appendPartition(matches: Iterable<String>, isExact: Boolean = false) {
             val frequentList = ArrayList<String>()
             val nonFrequentList = ArrayList<String>()
             for (word in matches) {
@@ -162,10 +182,13 @@ class TableImeTable(
                     nonFrequentList.add(word)
                 }
             }
-            frequentList.sortWith { a, b ->
-                val ca = frequentWordCounts[a] ?: 0
-                val cb = frequentWordCounts[b] ?: 0
-                cb.compareTo(ca)
+            val shouldSortByCount = !isExact || !rankingPolicy.preserveHomocodeTableOrder
+            if (shouldSortByCount) {
+                frequentList.sortWith { a, b ->
+                    val ca = frequentWordCounts[a] ?: 0
+                    val cb = frequentWordCounts[b] ?: 0
+                    cb.compareTo(ca)
+                }
             }
             result.addAll(frequentList)
             result.addAll(nonFrequentList)
@@ -178,31 +201,30 @@ class TableImeTable(
                 for (w in fuzzyMatches) {
                     if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
                 }
-                appendPartition(commonFuzzy)
-                appendPartition(remainingFuzzy)
+                appendPartition(commonFuzzy, isExact = false)
+                appendPartition(remainingFuzzy, isExact = false)
             } else {
-                appendPartition(fuzzyMatches)
+                appendPartition(fuzzyMatches, isExact = false)
             }
             return result
         }
 
-        appendPartition(baseExact)
+        appendPartition(baseExact, isExact = true)
+        appendPartition(basePrefix, isExact = false)
         if (isCommonWord != null && fuzzyMatches.isNotEmpty()) {
             val commonFuzzy = ArrayList<String>()
             val remainingFuzzy = ArrayList<String>()
             for (w in fuzzyMatches) {
                 if (isCommonWord(w)) commonFuzzy.add(w) else remainingFuzzy.add(w)
             }
-            appendPartition(commonFuzzy)
-            appendPartition(basePrefix)
-            appendPartition(extExact)
-            appendPartition(extPrefix)
-            appendPartition(remainingFuzzy)
+            appendPartition(commonFuzzy, isExact = false)
+            appendPartition(extExact, isExact = true)
+            appendPartition(extPrefix, isExact = false)
+            appendPartition(remainingFuzzy, isExact = false)
         } else {
-            appendPartition(basePrefix)
-            appendPartition(extExact)
-            appendPartition(extPrefix)
-            appendPartition(fuzzyMatches)
+            appendPartition(extExact, isExact = true)
+            appendPartition(extPrefix, isExact = false)
+            appendPartition(fuzzyMatches, isExact = false)
         }
         return result
     }
@@ -211,7 +233,9 @@ class TableImeTable(
         query: String,
         out: MutableSet<String>,
         max: Int,
-        includeExtended: Boolean = false
+        includeExtended: Boolean = false,
+        allowDeletion: Boolean = true,
+        neighborMap: Map<Char, List<Char>> = emptyMap()
     ) {
         if (query.length < 3) return
         val seenCodes = HashSet<String>()
@@ -228,31 +252,38 @@ class TableImeTable(
         }
 
         // 1. First-key neighbor substitution (highest priority for neighbor typos like 'cnd' -> 'vnd' -> 好)
-        val firstChar = query[0]
-        val firstNeighbors = QWERTY_NEIGHBORS[firstChar]
-        if (firstNeighbors != null) {
-            val tail = query.substring(1)
-            for (nb in firstNeighbors) {
-                tryCode(nb + tail)
+        if (neighborMap.isNotEmpty()) {
+            val firstChar = query[0]
+            val firstNeighbors = neighborMap[firstChar]
+            if (firstNeighbors != null) {
+                val tail = query.substring(1)
+                for (nb in firstNeighbors) {
+                    tryCode(nb + tail)
+                }
             }
         }
 
         // 2. Extra key deletion (drop 1 char, for typos like 'gnrmi' -> drop 'r' -> 'gnmi' -> 壽)
-        for (i in 0 until query.length) {
-            val sub = query.removeRange(i, i + 1)
-            if (sub.length >= 2) {
-                tryCode(sub)
+        // Only run when allowDeletion is true (e.g. when basePrefix is empty)
+        if (allowDeletion) {
+            for (i in 0 until query.length) {
+                val sub = query.removeRange(i, i + 1)
+                if (sub.length >= 2) {
+                    tryCode(sub)
+                }
             }
         }
 
         // 3. Other positions neighbor substitution
-        for (i in 1 until query.length) {
-            val ch = query[i]
-            val neighbors = QWERTY_NEIGHBORS[ch] ?: continue
-            val prefix = query.substring(0, i)
-            val suffix = query.substring(i + 1)
-            for (nb in neighbors) {
-                tryCode(prefix + nb + suffix)
+        if (neighborMap.isNotEmpty()) {
+            for (i in 1 until query.length) {
+                val ch = query[i]
+                val neighbors = neighborMap[ch] ?: continue
+                val prefix = query.substring(0, i)
+                val suffix = query.substring(i + 1)
+                for (nb in neighbors) {
+                    tryCode(prefix + nb + suffix)
+                }
             }
         }
     }
@@ -414,37 +445,6 @@ class TableImeTable(
         private const val TAG = "TableImeTable"
         private const val MAGIC_CJTB = 0x42544A43 // "CJTB" in little endian
 
-        val QWERTY_NEIGHBORS: Map<Char, List<Char>> = mapOf(
-            'q' to listOf('w', 'a', 's'),
-            'w' to listOf('q', 'e', 's', 'a', 'd'),
-            'e' to listOf('w', 'r', 'd', 's', 'f'),
-            'r' to listOf('e', 't', 'f', 'd', 'g'),
-            't' to listOf('r', 'y', 'g', 'f', 'h'),
-            'y' to listOf('t', 'u', 'h', 'g', 'j'),
-            'u' to listOf('y', 'i', 'j', 'h', 'k'),
-            'i' to listOf('u', 'o', 'k', 'j', 'l'),
-            'o' to listOf('i', 'p', 'l', 'k'),
-            'p' to listOf('o', 'l'),
-
-            'a' to listOf('q', 'w', 's', 'z'),
-            's' to listOf('a', 'd', 'w', 'e', 'z', 'x'),
-            'd' to listOf('s', 'f', 'e', 'r', 'x', 'c'),
-            'f' to listOf('d', 'g', 'r', 't', 'c', 'v'),
-            'g' to listOf('f', 'h', 't', 'y', 'v', 'b'),
-            'h' to listOf('g', 'j', 'y', 'u', 'b', 'n'),
-            'j' to listOf('h', 'k', 'u', 'i', 'n', 'm'),
-            'k' to listOf('j', 'l', 'i', 'o', 'm'),
-            'l' to listOf('k', 'o', 'p'),
-
-            'z' to listOf('a', 's', 'x'),
-            'x' to listOf('z', 'c', 's', 'd'),
-            'c' to listOf('x', 'v', 'd', 'f'),
-            'v' to listOf('c', 'b', 'f', 'g'),
-            'b' to listOf('v', 'n', 'g', 'h'),
-            'n' to listOf('b', 'm', 'h', 'j'),
-            'm' to listOf('n', 'j', 'k')
-        )
-
         fun loadSourceFromAsset(context: Context, assetPath: String): Source? {
             try {
                 // Try .bin first if not explicitly named
@@ -485,9 +485,10 @@ class TableImeTable(
             return null
         }
 
-        fun loadFromAsset(context: Context, assetPath: String): TableImeTable {
+        @JvmOverloads
+        fun loadFromAsset(context: Context, assetPath: String, spec: TableImeSpec? = null): TableImeTable {
             val source = loadSourceFromAsset(context, assetPath) ?: ListSource(emptyList())
-            return TableImeTable(source)
+            return TableImeTable(source, spec = spec)
         }
 
         private fun parseTsv(bytes: ByteArray): List<Entry> {

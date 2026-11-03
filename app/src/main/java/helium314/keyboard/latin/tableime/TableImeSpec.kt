@@ -9,6 +9,12 @@ interface TableImeSpec {
     val extendedTableAsset: String?
     val nextWordsAsset: String? get() = null
 
+    /** Typo tolerance (fuzzy matching) policy. Override to customize for specific IME rules. */
+    val fuzzyPolicy: TableImeFuzzyPolicy get() = TableImeFuzzyPolicy.DEFAULT
+
+    /** Candidate ranking and homocode ordering policy. Override to customize. */
+    val rankingPolicy: TableImeRankingPolicy get() = TableImeRankingPolicy.DEFAULT
+
     fun codeToRadical(c: Char): String
     fun getRadicalString(code: String): String {
         val sb = StringBuilder(code.length)

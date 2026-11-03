@@ -179,7 +179,7 @@ class TableImeTest {
         assertTrue(baseFile.exists())
         assertTrue(wordsFile.exists())
 
-        val table = TableImeTable(TableImeTable.BinarySource(java.nio.ByteBuffer.wrap(baseFile.readBytes())))
+        val table = TableImeTable(TableImeTable.BinarySource(java.nio.ByteBuffer.wrap(baseFile.readBytes())), spec = CangjieSpec)
         val predictor = TableImeWordPredictor(TableImeWordPredictor.BinarySource(java.nio.ByteBuffer.wrap(wordsFile.readBytes())))
         val isCommon: (String) -> Boolean = { predictor.isCommon(it) }
 
@@ -208,6 +208,63 @@ class TableImeTest {
         val resShdvi = table.lookup("shdvi", enableFuzzy = true, isCommonWord = isCommon)
         assertTrue(resShdvi.isNotEmpty())
         assertEquals("鬆", resShdvi[0])
+
+        // 6. In-progress typing 'hgh' -> valid base prefix match '先' must NOT be hijacked by deletion fuzzy '壬'
+        val resHgh = table.lookup("hgh", enableFuzzy = true, isCommonWord = isCommon)
+        assertTrue(resHgh.contains("先"))
+        val xianIdx = resHgh.indexOf("先")
+        val renIdx = resHgh.indexOf("壬")
+        assertTrue(xianIdx >= 0)
+        assertTrue(renIdx == -1 || xianIdx < renIdx)
+    }
+
+    @Test
+    fun testTableImePolicyDecoupling() {
+        val baseEntries = listOf(
+            TableImeTable.Entry("kb", "有"),
+            TableImeTable.Entry("kb", "冇"),
+            TableImeTable.Entry("kbc", "某")
+        )
+        // 1. Default table without spec has DEFAULT ranking & fuzzy (preserveHomocodeTableOrder = true, fuzzy enabled = false)
+        val defaultTable = TableImeTable(baseEntries)
+        // Prefix matching allowed by default
+        val resPrefix = defaultTable.lookup("kb")
+        assertTrue(resPrefix.contains("某"))
+
+        // 2. Custom spec disabling prefix matching (e.g. strict fixed-length IME)
+        val strictSpec = object : helium314.keyboard.latin.tableime.TableImeSpec {
+            override val id = "strict"
+            override val combiningRules = "strict"
+            override val maxCodeLength = 2
+            override val baseTableAsset = ""
+            override val extendedTableAsset = null
+            override fun codeToRadical(c: Char) = c.toString()
+            override val rankingPolicy = object : helium314.keyboard.latin.tableime.TableImeRankingPolicy {
+                override val allowPrefixMatching = false
+            }
+        }
+        val strictTable = TableImeTable(baseEntries, spec = strictSpec)
+        val resStrict = strictTable.lookup("kb")
+        assertEquals(listOf("有", "冇"), resStrict)
+        assertFalse(resStrict.contains("某"))
+
+        // 3. Custom spec with preserveHomocodeTableOrder = false (old behavior where frequency reorders exact matches)
+        val oscillatingSpec = object : helium314.keyboard.latin.tableime.TableImeSpec {
+            override val id = "oscillating"
+            override val combiningRules = "oscillating"
+            override val maxCodeLength = 2
+            override val baseTableAsset = ""
+            override val extendedTableAsset = null
+            override fun codeToRadical(c: Char) = c.toString()
+            override val rankingPolicy = object : helium314.keyboard.latin.tableime.TableImeRankingPolicy {
+                override val preserveHomocodeTableOrder = false
+            }
+        }
+        val oscTable = TableImeTable(baseEntries, spec = oscillatingSpec)
+        // '冇' count 50 > '有' count 10 -> '冇' overtakes '有' when preserveHomocodeTableOrder = false
+        val resOsc = oscTable.lookup("kb", frequentWordCounts = mapOf("有" to 10, "冇" to 50))
+        assertEquals("冇", resOsc[0])
+        assertEquals("有", resOsc[1])
     }
 
     @Test
@@ -411,7 +468,8 @@ class TableImeTest {
         val result = table.lookup("a", frequentWordCounts = counts)
         assertEquals(listOf("日", "曰", "昌", "明", "晶"), result)
 
-        // If 曰 has higher count than 日
+        // If 曰 has higher count than 日:
+        // With stable exact ordering (both used), original table order is preserved: 日 remains before 曰!
         val counts2 = mapOf(
             "曰" to 20,
             "日" to 10,
@@ -419,7 +477,22 @@ class TableImeTest {
             "昌" to 5
         )
         val result2 = table.lookup("a", frequentWordCounts = counts2)
-        assertEquals(listOf("曰", "日", "明", "昌", "晶"), result2)
+        assertEquals(listOf("日", "曰", "明", "昌", "晶"), result2)
+
+        // Homocode stability test: exact matches that have both been used (e.g. 有/冇 with code "kb")
+        val kbEntries = listOf(
+            TableImeTable.Entry("kb", "有"),
+            TableImeTable.Entry("kb", "冇")
+        )
+        val kbTable = TableImeTable(kbEntries)
+        // 1. Neither used
+        assertEquals(listOf("有", "冇"), kbTable.lookup("kb", frequentWordCounts = null))
+        // 2. Only 冇 used -> 冇 moves ahead
+        assertEquals(listOf("冇", "有"), kbTable.lookup("kb", frequentWordCounts = mapOf("冇" to 1)))
+        // 3. Both used (冇 count 5, 有 count 4) -> stable table order preserved, 有 stays before 冇!
+        assertEquals(listOf("有", "冇"), kbTable.lookup("kb", frequentWordCounts = mapOf("冇" to 5, "有" to 4)))
+        // 4. Both used (冇 count 1, 有 count 10) -> 有 still before 冇!
+        assertEquals(listOf("有", "冇"), kbTable.lookup("kb", frequentWordCounts = mapOf("冇" to 1, "有" to 10)))
     }
 
     @Test
@@ -555,10 +628,11 @@ class TableImeTest {
         assertEquals("明", resAB[0])
         assertEquals("冐", resAB[1])
 
-        // Option A ordering with counts
+        // Option A ordering with counts:
+        // With stable exact ordering (both used), original table order is preserved: 日 remains before 曰!
         val counts = mapOf("曰" to 20, "日" to 10, "明" to 30, "昌" to 5)
         val resCounts = table.lookup("a", frequentWordCounts = counts)
-        assertEquals(listOf("曰", "日", "明", "昌", "晶"), resCounts)
+        assertEquals(listOf("日", "曰", "明", "昌", "晶"), resCounts)
     }
 
     @Test

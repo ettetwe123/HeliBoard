@@ -43,11 +43,12 @@ The engine is built around three core principles:
 
 | Class / Interface | Description |
 | :--- | :--- |
-| **`TableImeSpec`** | Specification interface. Defines IME metadata: identifier (`id`), combining rule identifier (`combiningRules`), maximum code length (`maxCodeLength`), asset paths (`baseTableAsset`, `extendedTableAsset`, `nextWordsAsset`), and character-to-radical mapping (`codeToRadical`). |
+| **`TableImeSpec`** | Specification interface. Defines IME metadata: identifier (`id`), combining rule identifier (`combiningRules`), maximum code length (`maxCodeLength`), asset paths (`baseTableAsset`, `extendedTableAsset`, `nextWordsAsset`), character-to-radical mapping (`codeToRadical`), and references to `fuzzyPolicy` and `rankingPolicy`. |
+| **`TableImePolicy`** | Decoupled policy interfaces (`TableImeFuzzyPolicy`, `TableImeRankingPolicy`). Allows different table IMEs (Cangjie vs Quick vs Wubi) to configure their own rules for fuzzy tolerance, neighbor keys, prefix matching, and homocode stability without hardcoded logic. |
 | **`TableImeRegistry`** | Central registry and singleton manager. Holds registered specs and manages background thread loading (`preloadAsync`, `ensureExtendedLoaded`) for `TableImeTable` and `TableImeWordPredictor`. |
-| **`TableImeTable`** | TSV parser and search engine. Supports exact matching, prefix matching, frequent-word prioritization (Option A ordering), and dynamic inclusion of extended (rare) character tables. |
+| **`TableImeTable`** | TSV and binary table search engine. Supports exact matching, prefix matching, typo tolerance (neighbor keys and extra-key deletion), homocode stability, and dynamic inclusion of extended (rare) character tables. |
 | **`TableImeCombiner`** | Implements HeliBoard's `Combiner` interface. Intercepts key presses, manages raw code state, and emits composing radical strings (e.g. `ab` $\to$ `日月`) for UI feedback. |
-| **`TableImeHandler`** | Static controller interacting with `InputLogic`. Intercepts Space (commits 1st candidate), Enter (commits raw composing or sends newline), Backspace, and updates user frequency history. |
+| **`TableImeHandler`** | Static controller interacting with `InputLogic`. Intercepts Space (synchronous commit of 1st candidate), Enter (commits raw composing or sends newline), Backspace, and updates user frequency history. |
 | **`TableImeWordPredictor`** | Next-word predictor. When the composing buffer is empty, predicts next words based on the text committed immediately before the cursor. |
 | **`TableImeUserHistory`** | Persistent frequency tracker backed by `SharedPreferences`. Tracks committed words and dynamically boosts candidate ranking over time. |
 | **`TableImeCandidatesView`** | Expandable full-keyboard candidate picker view displayed when clicking the dropdown button on the suggestion strip. |
@@ -160,7 +161,55 @@ No extra configuration is required in settings screens.
 
 ---
 
-## 3. Strict Latin Core Isolation Rules
+## 3. Candidate Ranking, Typo Tolerance & Commit Logic
+
+### 3.1 Option A Candidate Ordering
+
+Candidates are partitioned into tiers and displayed in strict order:
+```
+Base Exact Matches ──▶ Base Prefix Matches ──▶ Common Fuzzy Matches ──▶ Ext Exact ──▶ Ext Prefix ──▶ Remaining Fuzzy
+```
+
+- **Base entries always precede extended entries**: Common characters from the primary table take precedence over obscure Kangxi or Unicode extension characters.
+- **Prefix matches precede fuzzy matches**: Zero-error direct prefix matches representing the word the user is actively typing always rank ahead of fuzzy typo matches.
+
+### 3.2 Homocode Stability (Muscle Memory Protection)
+
+When multiple characters share the exact same code (e.g., Cangjie code `kb` for both `有` and `冇`):
+- **Problem**: Naive `count DESC` sorting causes "leapfrog oscillation" (每選一次就反超換位), where picking `冇` moves it to slot 1, then picking `有` moves `有` back to slot 1, destroying touch-typing muscle memory.
+- **Solution**: Within exact matches (`isExact = true`), all frequently used characters (`count > 0`) retain their **original base table order** instead of sorting by usage count descending.
+  - `有` (index 0 in table) and `冇` (index 1 in table) permanently stay as `[有, 冇]`.
+  - Unused rare characters (`count == 0`) remain behind all used characters.
+  - For prefix matches (`isExact = false`), characters have different codes and continue to be sorted by usage count descending to float frequent words to the front.
+
+### 3.3 Typo Tolerance & Fuzzy Matching Rules
+
+Typo tolerance handles neighbor key slips (spatial proximity) and accidental extra key insertions while preventing false positives:
+
+1. **Trigger Threshold**:
+   - Fuzzy matching only executes when total direct candidates (`baseExact + basePrefix + extExact + extPrefix`) are fewer than **10**, and no common exact match exists.
+   - If direct suggestions are plentiful, fuzzy matching is bypassed entirely to save CPU and avoid candidate pollution.
+
+2. **Extra-Key Deletion Guard**:
+   - Dropping a key (e.g. `gnrmi` $\to$ `gnmi` $\to$ `壽`) is only permitted when `basePrefix.isEmpty()` (the typed code matches no word or prefix in the dictionary).
+   - When `basePrefix` is non-empty (e.g. typing `hgh` towards `hghu` `先`), deletion is disabled so shorter code words (e.g. `hg` `壬`) can never hijack the candidates list.
+
+3. **Neighbor Key Substitution**:
+   - Inspects QWERTY adjacent keys (e.g. `cnd` $\to$ `vnd` $\to$ `好`).
+   - If matched, common fuzzy words are appended after `basePrefix`, keeping legitimate in-progress prefix matches at the front.
+
+### 3.4 Synchronous Commit on Space (Fast-Typing Protection)
+
+In LatinIME, `getSuggestedWords()` runs asynchronously on a background worker thread (`mNonUIThreadHandler`).
+
+- **Problem**: When typing at high speed, pressing Space can reach the UI thread before the background worker finishes computing candidates. If the handler falls back to LatinIME's default `SuggestedWords`, index 0 contains `mTypedWordInfo` (the raw composing code / radicals, e.g. `竹土` or `hgh`), causing the raw code to be committed instead of the candidate character.
+- **Solution**: In `TableImeHandler.resolveCommit()`, pressing Space directly performs an in-memory synchronous lookup (`table.lookup(rawCode)`) using `wordComposer.rawComposingCode` on the UI thread.
+  - Because `cangjie_base.bin` binary lookups take less than **20 µs**, synchronous resolution is instantaneous.
+  - Guarantees 0ms race-condition-free commits and ensures the first candidate Chinese character is always committed, never the raw code.
+
+---
+
+## 4. Strict Latin Core Isolation Rules
 
 When making modifications to the Table IME engine or its integration points, adhere to these isolation rules:
 

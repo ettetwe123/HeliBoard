@@ -37,7 +37,7 @@ object TableImeRegistry {
         // Load synchronously if needed on first query
         synchronized(tables) {
             tables[spec.id]?.let { return it }
-            val table = TableImeTable.loadFromAsset(context, spec.baseTableAsset)
+            val table = TableImeTable.loadFromAsset(context, spec.baseTableAsset, spec)
             tables[spec.id] = table
             return table
         }

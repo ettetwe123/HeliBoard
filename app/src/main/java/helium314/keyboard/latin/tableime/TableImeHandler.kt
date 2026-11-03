@@ -112,14 +112,13 @@ object TableImeHandler {
         wordComposer: WordComposer,
         isEnter: Boolean
     ): CommitResult? {
-        // 1. Try to get candidate 0 from suggestedWords
         var firstWord: String? = null
-        if (suggestedWords != null && suggestedWords.size() > 0) {
-            firstWord = suggestedWords.autoCorrectionWord ?: suggestedWords.getInfo(0).mWord
-        }
 
-        // 2. If suggestedWords didn't have it, query table directly
-        if (firstWord == null && wordComposer.isComposingWord) {
+        // 1. Always query table synchronously using wordComposer's current rawComposingCode!
+        // When typing fast, suggestedWords is computed asynchronously on a background thread and may be
+        // stale or default LatinIME SuggestedWords (where getInfo(0) is typedWord/字碼).
+        // Synchronous table lookup (< 20μs) eliminates race conditions and guarantees we commit the character, not the code!
+        if (wordComposer.isComposingWord) {
             val rawCode = wordComposer.rawComposingCode
             val combiningSpec = wordComposer.combiningSpec
             if (!rawCode.isNullOrEmpty() && combiningSpec != null) {
@@ -148,6 +147,14 @@ object TableImeHandler {
                         }
                     }
                 }
+            }
+        }
+
+        // 2. Fallback to suggestedWords ONLY if it's a valid TableImeSuggestedWords (and not prediction)
+        if (firstWord == null && suggestedWords != null && suggestedWords.mIsTableIme && suggestedWords.size() > 0) {
+            val isPred = (suggestedWords as? TableImeSuggestedWords)?.isPrediction == true
+            if (!isPred) {
+                firstWord = suggestedWords.autoCorrectionWord ?: suggestedWords.getInfo(0).mWord
             }
         }
 
