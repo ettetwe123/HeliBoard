@@ -27,6 +27,9 @@ object TableImeUserHistory {
     // In-memory map of word -> WordStats per table id (e.g. "cangjie")
     private val memoryCache = ConcurrentHashMap<String, ConcurrentHashMap<String, WordStats>>()
 
+    // Fast in-memory cached map of word -> count for direct O(1) lookup without allocations during typing
+    private val countsCache = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
+
     // In-memory map of prevWord -> (nextWord -> WordStats) per table id
     private val bigramCache = ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<String, WordStats>>>()
 
@@ -38,8 +41,10 @@ object TableImeUserHistory {
     private var commitCountSinceDecay = 0
 
     fun getFrequentWordCounts(context: Context, tableId: String): Map<String, Int> {
-        val statsMap = getFrequentWordStats(context, tableId)
-        return statsMap.mapValues { it.value.count }
+        val existing = countsCache[tableId]
+        if (existing != null) return existing
+        getFrequentWordStats(context, tableId)
+        return countsCache[tableId] ?: emptyMap()
     }
 
     fun getFrequentWordStats(context: Context, tableId: String): ConcurrentHashMap<String, WordStats> {
@@ -47,6 +52,7 @@ object TableImeUserHistory {
         if (existing != null) return existing
 
         val map = ConcurrentHashMap<String, WordStats>()
+        val countsMap = ConcurrentHashMap<String, Int>()
         val prefs = DeviceProtectedUtils.getSharedPreferences(context)
         val serialized = prefs.getString(KEY_PREFIX + tableId + KEY_COUNTS_SUFFIX, null)
         val now = (System.currentTimeMillis() / 1000).toInt()
@@ -60,7 +66,9 @@ object TableImeUserHistory {
                     val key = parts[0]
                     val count = if (parts.size >= 2) parts[1].toIntOrNull() ?: 1 else 1
                     val lastUsed = if (parts.size >= 3) parts[2].toIntOrNull() ?: now else now
-                    map[key] = WordStats(minOf(MAX_COUNT_CAP, count), lastUsed)
+                    val cappedCount = minOf(MAX_COUNT_CAP, count)
+                    map[key] = WordStats(cappedCount, lastUsed)
+                    countsMap[key] = cappedCount
                 }
             }
         } else {
@@ -69,10 +77,12 @@ object TableImeUserHistory {
             if (legacy != null) {
                 for (w in legacy) {
                     map[w] = WordStats(1, now)
+                    countsMap[w] = 1
                 }
             }
         }
         memoryCache[tableId] = map
+        countsCache[tableId] = countsMap
         return map
     }
 
@@ -87,14 +97,18 @@ object TableImeUserHistory {
     fun recordWord(context: Context, tableId: String, word: String) {
         if (word.isEmpty()) return
         val map = getFrequentWordStats(context, tableId)
+        val countsMap = countsCache.computeIfAbsent(tableId) { ConcurrentHashMap() }
         val now = (System.currentTimeMillis() / 1000).toInt()
 
         map.compute(word) { _, stats ->
             if (stats == null) {
+                countsMap[word] = 1
                 WordStats(1, now)
             } else {
-                stats.count = minOf(MAX_COUNT_CAP, stats.count + 1)
+                val newCount = minOf(MAX_COUNT_CAP, stats.count + 1)
+                stats.count = newCount
                 stats.lastUsed = now
+                countsMap[word] = newCount
                 stats
             }
         }
@@ -104,7 +118,7 @@ object TableImeUserHistory {
         // Periodic aging decay check
         if (++commitCountSinceDecay >= DECAY_TRIGGER_COMMITS) {
             commitCountSinceDecay = 0
-            applyDecay(map)
+            applyDecay(tableId, map)
         }
     }
 
@@ -196,9 +210,12 @@ object TableImeUserHistory {
     /**
      * Periodically reduces counts to prevent old words from permanently dominating.
      */
-    private fun applyDecay(map: ConcurrentHashMap<String, WordStats>) {
-        for ((_, stats) in map) {
-            stats.count = maxOf(1, (stats.count * 0.85).toInt())
+    private fun applyDecay(tableId: String, map: ConcurrentHashMap<String, WordStats>) {
+        val countsMap = countsCache[tableId]
+        for ((word, stats) in map) {
+            val decayed = maxOf(1, (stats.count * 0.85).toInt())
+            stats.count = decayed
+            countsMap?.put(word, decayed)
         }
     }
 
@@ -292,6 +309,7 @@ object TableImeUserHistory {
 
     fun clearFrequentWords(context: Context, tableId: String) {
         memoryCache[tableId]?.clear()
+        countsCache[tableId]?.clear()
         val prefs = DeviceProtectedUtils.getSharedPreferences(context)
         prefs.edit {
             remove(KEY_PREFIX + tableId)

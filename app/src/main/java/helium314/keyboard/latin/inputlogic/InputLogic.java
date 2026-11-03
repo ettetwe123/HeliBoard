@@ -2076,10 +2076,14 @@ public final class InputLogic {
             return mConnection.getNgramContextFromNthPreviousWord(spacingAndPunctuations, nthPreviousWord);
         }
         if (TableImeHandler.isTableIme(mWordComposer.getCombiningSpec())) {
-            final CharSequence textBeforeCursor = mConnection.getTextBeforeCursor(20, 0);
-            if (textBeforeCursor != null && textBeforeCursor.length() > 0) {
-                return new NgramContext(new NgramContext.WordInfo(textBeforeCursor.toString()));
+            final String lastCommitted = TableImeHandler.getLastCommittedWord();
+            if (lastCommitted != null && !lastCommitted.isEmpty()) {
+                return new NgramContext(new NgramContext.WordInfo(lastCommitted));
             }
+            if (LastComposedWord.NOT_A_COMPOSED_WORD != mLastComposedWord && mLastComposedWord.mCommittedWord != null) {
+                return new NgramContext(new NgramContext.WordInfo(mLastComposedWord.mCommittedWord.toString()));
+            }
+            return NgramContext.BEGINNING_OF_SENTENCE;
         }
         if (LastComposedWord.NOT_A_COMPOSED_WORD == mLastComposedWord) {
             return NgramContext.BEGINNING_OF_SENTENCE;
